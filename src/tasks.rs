@@ -1600,10 +1600,9 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
                             shallow_exact_rejected += 1;
                             continue;
                         }
-                        let digest = format!(
-                            "{:x}",
-                            Sha256::digest(values.iter().map(|v| *v as u8).collect::<Vec<_>>())
-                        );
+                        let digest = crate::lower_hex(&Sha256::digest(
+                            values.iter().map(|v| *v as u8).collect::<Vec<_>>(),
+                        ));
                         let period_class = if analytical.detected_exact_period.is_some() {
                             "periodic"
                         } else if analytical.detected_additive_period.is_some() {
@@ -2122,7 +2121,7 @@ fn expression_digest(expressions: &[Expr], arity: u8) -> Option<String> {
         hasher.update((output.len() as u32).to_le_bytes());
         hasher.update(&output);
     }
-    Some(format!("{:x}", hasher.finalize()))
+    Some(crate::lower_hex(&hasher.finalize()))
 }
 
 /// Exact, sandbox-free verifier for compact symbolic programs. Validation
@@ -2446,7 +2445,7 @@ mod tests {
 
     #[test]
     fn analytical_layer_can_exclude_all_named_families() {
-        use rand::{Rng, SeedableRng};
+        use rand::{RngExt, SeedableRng};
         use rand_chacha::ChaCha20Rng;
 
         let mut rng = ChaCha20Rng::seed_from_u64(0xB3EC_FCC0);

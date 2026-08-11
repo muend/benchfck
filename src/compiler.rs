@@ -1,5 +1,5 @@
 use crate::ir::{Program, Statement};
-use rand::{Rng, SeedableRng, seq::SliceRandom};
+use rand::{RngExt, SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

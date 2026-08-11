@@ -153,7 +153,7 @@ fn validate_generate_output(path: &Path, class: ArtifactClass) -> Result<(), Str
 
 fn update_evidence_manifest(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let bytes = fs::read(path)?;
-    let hash = format!("{:x}", Sha256::digest(&bytes));
+    let hash = benchfck::lower_hex(&Sha256::digest(&bytes));
     let relative = path.to_string_lossy().replace('\\', "/");
     let manifest_path = Path::new("evidence/MANIFEST.txt");
     let manifest = fs::read_to_string(manifest_path)?;
