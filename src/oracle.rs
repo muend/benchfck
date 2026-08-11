@@ -122,7 +122,7 @@ pub fn exhaustive_validate(
     Ok(SemanticFingerprint {
         algorithm: "sha256_length_delimited_domain_table".into(),
         domain_size: size,
-        digest_hex: format!("{:x}", hasher.finalize()),
+        digest_hex: crate::lower_hex(&hasher.finalize()),
     })
 }
 

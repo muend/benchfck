@@ -11,7 +11,7 @@ use crate::{
     },
     tasks,
 };
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -297,7 +297,7 @@ fn hash(parts: &[&[u8]]) -> String {
         h.update((p.len() as u64).to_le_bytes());
         h.update(p)
     }
-    format!("{:x}", h.finalize())[..20].to_string()
+    crate::lower_hex(&h.finalize())[..20].to_string()
 }
 fn target(b: DifficultyBand) -> u64 {
     match b {
