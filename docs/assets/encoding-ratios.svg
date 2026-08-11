@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="330" viewBox="0 0 920 330" role="img" aria-labelledby="title desc">
+  <title id="title">Diagnostic BPE ratios relative to E0</title>
+  <desc id="desc">Grouped bars show prompt and program ratios for E2 and E3 measured with cl100k_base on 2026-08-11.</desc>
+  <rect width="920" height="330" rx="18" fill="#0d1117"/>
+  <text x="42" y="42" fill="#f0f6fc" font-family="system-ui,Segoe UI,sans-serif" font-size="21" font-weight="700">Diagnostic BPE ratio relative to E0</text>
+  <text x="42" y="67" fill="#8b949e" font-family="system-ui,Segoe UI,sans-serif" font-size="13">cl100k_base · 2026-08-11 · engineering diagnostic, not release evidence</text>
+  <line x1="190" y1="95" x2="190" y2="270" stroke="#30363d"/>
+  <line x1="190" y1="270" x2="870" y2="270" stroke="#30363d"/>
+  <g fill="#8b949e" font-family="system-ui,Segoe UI,sans-serif" font-size="12">
+    <text x="185" y="289">0×</text><text x="332" y="289">2×</text><text x="482" y="289">4×</text><text x="632" y="289">6×</text><text x="782" y="289">8×</text>
+  </g>
+  <g stroke="#21262d">
+    <line x1="340" y1="95" x2="340" y2="270"/><line x1="490" y1="95" x2="490" y2="270"/><line x1="640" y1="95" x2="640" y2="270"/><line x1="790" y1="95" x2="790" y2="270"/>
+  </g>
+  <g font-family="system-ui,Segoe UI,sans-serif" font-size="14">
+    <text x="42" y="127" fill="#f0f6fc">E2 / E0 · prompt</text><rect x="190" y="108" width="252" height="24" rx="5" fill="#58a6ff"/><text x="451" y="126" fill="#f0f6fc">3.356×</text>
+    <text x="42" y="167" fill="#f0f6fc">E2 / E0 · program</text><rect x="190" y="148" width="299" height="24" rx="5" fill="#79c0ff"/><text x="498" y="166" fill="#f0f6fc">3.981×</text>
+    <text x="42" y="217" fill="#f0f6fc">E3 / E0 · prompt</text><rect x="190" y="198" width="530" height="24" rx="5" fill="#a371f7"/><text x="729" y="216" fill="#f0f6fc">7.072×</text>
+    <text x="42" y="257" fill="#f0f6fc">E3 / E0 · program</text><rect x="190" y="238" width="651" height="24" rx="5" fill="#d2a8ff"/><text x="850" y="256" fill="#f0f6fc">8.681×</text>
+  </g>
+  <g font-family="system-ui,Segoe UI,sans-serif" font-size="12">
+    <rect x="42" y="302" width="12" height="12" rx="2" fill="#58a6ff"/><text x="61" y="312" fill="#8b949e">compact explicit addressing</text>
+    <rect x="270" y="302" width="12" height="12" rx="2" fill="#a371f7"/><text x="289" y="312" fill="#8b949e">verbose explicit addressing</text>
+  </g>
+</svg>
