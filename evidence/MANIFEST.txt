@@ -1,0 +1,2 @@
+# SHA-256 manifest. This file does not list itself.
+# Phase 2 release artifacts are appended only after all 2.0 gates pass.
