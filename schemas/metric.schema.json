@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://benchfck.local/schemas/metric.schema.json",
+  "title": "benchfck per-item metric v3",
+  "type": "object",
+  "required": ["schema_version", "task_id", "family", "correct", "parse_failure", "tokens_used", "n_ideal", "overhead_ratio", "abstraction_gain", "failure_mode"],
+  "properties": {
+    "schema_version": {"const": "benchfck.metric.v3"},
+    "task_id": {"type": "string"}, "family": {"enum": ["T1", "T2", "T3", "T4", "T5", "T6"]},
+    "correct": {"type": "boolean"}, "parse_failure": {"type": "boolean"},
+    "tokens_used": {"type": "integer", "minimum": 0}, "n_ideal": {"type": "integer", "minimum": 0},
+    "overhead_ratio": {"type": "number"}, "abstraction_gain": {"type": ["number", "null"]},
+    "first_divergence_step": {"type": ["integer", "null"]}, "criticality": {"enum": ["BENIGN", "CRITICAL", null]},
+    "failure_mode": {"enum": ["correct", "drift", "collapse", "parse_failure"]}
+  },
+  "additionalProperties": false
+}

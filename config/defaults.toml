@@ -1,0 +1,54 @@
+# PENDING DECISION: v1 conditionals intentionally have no `else` arm.
+if_without_else = true
+# PENDING DECISION: arity <= 2 keeps equivalence checks exhaustive.
+max_arity = 2
+# PENDING DECISION: three generation layouts plus one held-out layout.
+layout_disciplines = 4
+held_out_layout = "held_out"
+# PENDING DECISION: target number of equivalent compiler strategies.
+templates_per_statement = 3
+# PENDING DECISION: post-obfuscation mutation sensitivity threshold.
+avalanche_threshold = 0.60
+# PENDING DECISION: T1 asks for interior probes.
+trace_demand = "probe_based"
+# PENDING DECISION: pointer volatility is measured, not generated directly.
+pointer_volatility_as_covariate = true
+# PENDING DECISION: executions beyond this are NON_TERMINATING.
+step_cap = 1000000
+# Large programs may sample positions, but never fewer than this.
+minimum_avalanche_positions = 64
+# Canonical-idiom matches divided by BF length must remain below this value.
+off_idiom_threshold = 0.08
+# RLE is the accepted benchmark representation. Expanded and omitted remain
+# available through the library for the movement-channel diagnostic pilot.
+move_carrier = "rle"
+# Executed E0 steps that are not pointer movement must meet this floor.
+minimum_trace_semantic_density = 0.30
+# Non-movement E0 source characters divided by total E0 source characters.
+minimum_text_semantic_density = 0.35
+# E2 remains a compact explicit-addressing rung and is compared with its matched
+# E0 prompt. E3 is intentionally verbose and is controlled only by preregistered
+# token-matched pairs, not by this acceptance ratio.
+prompt_tokenizer = "cl100k_base"
+maximum_e2_prompt_bpe_ratio = 3.5
+# Static exports contain several deterministic interior probes per encoding.
+t1_probe_count = 3
+# Fold constant-only subexpressions, then apply this restricted-grammar EXPR
+# threshold (`inputs[N]` and `//` are each one token). The full T2 response has
+# a separate safety cap below.
+t2_nontriviality_threshold = 25
+# Hybrid nontriviality layer 1: attempt exact enumeration through depth 7, but
+# report and accept only the depth actually exhausted. Layer 2 supplies named
+# analytical family exclusions; no claim is made beyond the proven depth.
+t2_enumerator_target_ast_depth = 7
+t2_enumerator_min_proven_ast_depth = 3
+t2_enumerator_max_semantics = 1000000
+t2_enumerator_max_operator_applications = 1000000
+# Hybrid layer 2 has no independently selected family thresholds. Its scan
+# bounds are derived from t2_nontriviality_threshold, and a family rejects only
+# when it synthesizes a parser-valid witness below that same folded-token bound.
+# Absolute safety ceiling. Each item gets one T2 cap shared by E0/E1/E2/E3;
+# item difficulty features create variation across a batch.
+t2_token_cap = 384
+# T3 likewise has one item-level cap shared by all encodings.
+t3_token_cap = 96

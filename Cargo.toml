@@ -1,0 +1,28 @@
+[package]
+name = "benchfck"
+version = "0.4.0-alpha"
+edition = "2024"
+description = "A generator and exact harness for machine-state tracking benchmarks"
+license = "Apache-2.0"
+
+[lib]
+name = "benchfck"
+path = "src/lib.rs"
+
+[[bin]]
+name = "benchfck"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+rand = "0.9"
+rand_chacha = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+tiktoken = "3.5.1"
+toml = "0.9"
+
+[dev-dependencies]
+tempfile = "3"

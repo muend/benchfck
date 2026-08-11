@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://benchfck.local/schemas/task.schema.json",
+  "title": "benchfck task v3",
+  "type": "object",
+  "required": ["schema_version", "task_id", "program_id", "item_id", "family", "encoding", "prompt", "payload"],
+  "properties": {
+    "schema_version": {"const": "benchfck.task.v3"},
+    "task_id": {"type": "string"}, "program_id": {"type": "string"}, "item_id": {"type": "string"},
+    "family": {"enum": ["T1", "T2", "T3", "T4", "T5", "T6"]},
+    "encoding": {"enum": ["E0", "E1", "E2", "E3", "E4"]},
+    "prompt": {"type": "string"},
+    "hard_token_cap": {"type": ["integer", "null"], "minimum": 1},
+    "payload": {"type": "object"}
+  },
+  "additionalProperties": false
+}
