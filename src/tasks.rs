@@ -1460,6 +1460,7 @@ pub fn analyze_named_trivial_families(
 pub struct ConstructorSearchSurvivor {
     pub template_family: String,
     pub expression: String,
+    pub folded_expression_grammar_tokens: u64,
     pub semantic_digest_hex: String,
     pub semantic_cluster: String,
     pub detected_exact_period: Option<u16>,
@@ -1473,6 +1474,7 @@ pub struct ConstructorSearchReport {
     pub folded_expression_grammar_token_threshold_exclusive: u32,
     pub templates_generated: usize,
     pub analytically_rejected: usize,
+    pub reference_too_short_rejected: usize,
     pub shallow_exact_rejected: usize,
     pub requested_exact_ast_depth: u8,
     pub proven_exhaustive_ast_depth: u8,
@@ -1539,6 +1541,72 @@ fn shallow_parser_match_through_ast3(
     None
 }
 
+fn semantic_cardinality_bucket(cardinality: usize) -> &'static str {
+    match cardinality {
+        0..=8 => "0-8",
+        9..=16 => "9-16",
+        17..=32 => "17-32",
+        33..=64 => "33-64",
+        65..=128 => "65-128",
+        _ => "129-256",
+    }
+}
+
+/// A constructor-independent profile of the complete 256-point function.
+/// Template-family names are deliberately excluded so adding labels cannot
+/// manufacture apparent semantic diversity.
+pub(crate) fn constructor_semantic_profile(
+    values: &[i64],
+    analytical: &AnalyticalNontrivialityWitness,
+) -> String {
+    // Integer affine pieces are sensitive to where an otherwise irrelevant
+    // modular output bias crosses 255 -> 0. Normalize that translation before
+    // bucketing so constructor profiles describe shape, not the sampled bias.
+    let anchor = values.first().copied().unwrap_or(0);
+    let bias_normalized = values
+        .iter()
+        .map(|value| (value - anchor).rem_euclid(256))
+        .collect::<Vec<_>>();
+    let output_support = values
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let first_differences = values
+        .windows(2)
+        .map(|window| (window[1] - window[0]).rem_euclid(256))
+        .collect::<Vec<_>>();
+    let first_support = first_differences
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let second_support = first_differences
+        .windows(2)
+        .map(|window| (window[1] - window[0]).rem_euclid(256))
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let period_class = if analytical.detected_exact_period.is_some() {
+        "periodic"
+    } else if analytical.detected_additive_period.is_some() {
+        "additive-periodic"
+    } else {
+        "aperiodic-on-domain"
+    };
+    let piece_bucket = match minimum_integer_affine_pieces(&bias_normalized) {
+        0..=8 => "0-8",
+        9..=32 => "9-32",
+        33..=96 => "33-96",
+        _ => "97-plus",
+    };
+    format!(
+        "{period_class}/pieces-{piece_bucket}/outputs-{}/d1-{}/d2-{}",
+        semantic_cardinality_bucket(output_support),
+        semantic_cardinality_bucket(first_support),
+        semantic_cardinality_bucket(second_support),
+    )
+}
+
 /// Generates a preregistered coprime-modulus template grid, uses the calibrated
 /// analytical layer as a design oracle, then applies a genuinely exhaustive
 /// parser check through AST size 3. Survivors are proposals for later IR
@@ -1548,6 +1616,7 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
     let coefficients = [1u16, 3, 5, 7, 11];
     let mut templates_generated = 0;
     let mut analytically_rejected = 0;
+    let mut reference_too_short_rejected = 0;
     let mut shallow_exact_rejected = 0;
     let mut survivors = Vec::new();
     for (left_index, left) in moduli.iter().enumerate() {
@@ -1577,6 +1646,108 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
                             ),
                         ),
                         (
+                            "quotient_times_residue_plus_residue",
+                            format!(
+                                "((inputs[0]//{left})*(inputs[0]%{right})+(inputs[0]%{quotient})*{coefficient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "nested_quotient_residue_product",
+                            format!(
+                                "(((inputs[0]//{left})%{right})*(inputs[0]%{quotient})+(inputs[0]//{quotient})*{coefficient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "residue_square_plus_cross_product",
+                            format!(
+                                "((inputs[0]%{left})*(inputs[0]%{left})+(inputs[0]%{right})*(inputs[0]%{quotient})+(inputs[0]//{quotient})*{coefficient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "dual_coupled_residue_products",
+                            format!(
+                                "((inputs[0]%{left})*((inputs[0]//{right})%{quotient})+(inputs[0]%{right})*(inputs[0]%{quotient})*{coefficient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "dual_residue_product_with_nested_quotient",
+                            format!(
+                                "((inputs[0]%{left})*(inputs[0]%{right})+(inputs[0]%{quotient})*((inputs[0]//{left})%{right})*{coefficient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "self_quotient_plus_residue_product",
+                            format!(
+                                "(inputs[0]*(inputs[0]//{left})+(inputs[0]%{right})*(inputs[0]%{quotient})*{coefficient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "quotient_chain_product_plus_residue",
+                            format!(
+                                "(((inputs[0]//{left})%{right})*((inputs[0]//{right})%{quotient})+(inputs[0]%{left})*{coefficient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_residue_quotient",
+                            format!(
+                                "((inputs[0]%{left})*(inputs[0]//{left})*{coefficient}+(inputs[0]%{left})*3+(inputs[0]//{left})+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_residue_quotient_varied_linears",
+                            format!(
+                                "((inputs[0]%{left})*(inputs[0]//{left})*{coefficient}+(inputs[0]%{left})*{right}+(inputs[0]//{left})*{quotient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_residue_quotient_even_product_c2",
+                            format!(
+                                "((inputs[0]%{left})*(inputs[0]//{left})*2+(inputs[0]%{left})*{right}+(inputs[0]//{left})*{quotient}+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_residue_square",
+                            format!(
+                                "((inputs[0]%{left})*(inputs[0]%{left})*{coefficient}+(inputs[0]//{left})*3+(inputs[0]%{left})+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_quotient_square",
+                            format!(
+                                "((inputs[0]//{left})*(inputs[0]//{left})*{coefficient}+(inputs[0]%{left})*3+(inputs[0]//{left})+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_shifted_residue",
+                            format!(
+                                "(((inputs[0]%{left})+{coefficient})*(inputs[0]//{left})+(inputs[0]%{left})*3+(inputs[0]//{left})*5+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_shifted_quotient",
+                            format!(
+                                "((inputs[0]%{left})*((inputs[0]//{left})+{coefficient})+(inputs[0]%{left})*5+(inputs[0]//{left})*3+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_dual_shift",
+                            format!(
+                                "(((inputs[0]%{left})+{coefficient})*((inputs[0]//{left})+3)+(inputs[0]%{left})*5+(inputs[0]//{left})+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_residue_complement",
+                            format!(
+                                "((inputs[0]%{left})*({left}-1-(inputs[0]%{left}))+(inputs[0]//{left})*{coefficient}+(inputs[0]%{left})*3+113)%256"
+                            ),
+                        ),
+                        (
+                            "single_product_quotient_residue_sum",
+                            format!(
+                                "((inputs[0]//{left})*((inputs[0]//{left})+(inputs[0]%{left}))+(inputs[0]%{left})*{coefficient}+(inputs[0]//{left})*3+113)%256"
+                            ),
+                        ),
+                        (
                             "single_residue_control",
                             format!("((inputs[0]%{left})*{coefficient}+113)%256"),
                         ),
@@ -1595,6 +1766,13 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
                             analytically_rejected += 1;
                             continue;
                         }
+                        let folded_expression_grammar_tokens =
+                            folded_solution_token_count(&wrapped_solution(&expression))
+                                .expect("constructor search emits foldable parser expressions");
+                        if folded_expression_grammar_tokens < u64::from(threshold_exclusive) {
+                            reference_too_short_rejected += 1;
+                            continue;
+                        }
                         if shallow_parser_match_through_ast3(&values, threshold_exclusive).is_some()
                         {
                             shallow_exact_rejected += 1;
@@ -1603,26 +1781,13 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
                         let digest = crate::lower_hex(&Sha256::digest(
                             values.iter().map(|v| *v as u8).collect::<Vec<_>>(),
                         ));
-                        let period_class = if analytical.detected_exact_period.is_some() {
-                            "periodic"
-                        } else if analytical.detected_additive_period.is_some() {
-                            "additive-periodic"
-                        } else {
-                            "aperiodic-on-domain"
-                        };
-                        let piece_bucket = match analytical.minimum_integer_affine_pieces {
-                            0..=8 => "pieces-0-8",
-                            9..=32 => "pieces-9-32",
-                            33..=96 => "pieces-33-96",
-                            _ => "pieces-97-plus",
-                        };
+                        let semantic_cluster = constructor_semantic_profile(&values, &analytical);
                         survivors.push(ConstructorSearchSurvivor {
                             template_family: template_family.into(),
                             expression,
+                            folded_expression_grammar_tokens,
                             semantic_digest_hex: digest,
-                            semantic_cluster: format!(
-                                "{template_family}/{period_class}/{piece_bucket}"
-                            ),
+                            semantic_cluster,
                             detected_exact_period: analytical.detected_exact_period,
                             detected_additive_period: analytical.detected_additive_period,
                             minimum_integer_affine_pieces: analytical.minimum_integer_affine_pieces,
@@ -1643,10 +1808,11 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
         .collect::<std::collections::BTreeSet<_>>()
         .len();
     ConstructorSearchReport {
-        algorithm: "generated_coprime_template_grid_analytic_oracle_exact_ast3_v1".into(),
+        algorithm: "generated_coprime_template_grid_bias_invariant_profile_exact_ast3_v3".into(),
         folded_expression_grammar_token_threshold_exclusive: threshold_exclusive,
         templates_generated,
         analytically_rejected,
+        reference_too_short_rejected,
         shallow_exact_rejected,
         requested_exact_ast_depth: 7,
         proven_exhaustive_ast_depth: 3,
@@ -1954,8 +2120,9 @@ pub struct ReferenceSearchResult {
     pub matched_digest_hex: String,
 }
 
-/// Constructor-independent G2 search retained only to obtain a private perfect
-/// mock answer. It is not an acceptance proof and makes no minimality claim.
+/// Declared-family G2 search retained only to obtain a private perfect mock
+/// answer. It is not an acceptance proof and makes no minimality claim. The
+/// hybrid gate never consumes the result of this search.
 pub fn search_g2_reference_expression(
     e0: &str,
     arity: u8,
@@ -2016,6 +2183,14 @@ pub fn search_g2_reference_expression(
         for y in &y_terms {
             let x = "inputs[0]";
             for expression in [
+                format!("({bias}+(({x}%5)+1)*({x}//5)+({x}%5)*3+({x}//5)*5{y})%256"),
+                format!("({bias}+({x}%5)*({x}%5)*11+({x}//5)*3+({x}%5){y})%256"),
+                format!("({bias}+({x}%7)*({x}//7)*5+({x}%7)*11+({x}//7)*17{y})%256"),
+                format!("({bias}+({x}%5)*(5-1-({x}%5))+({x}//5)*3+({x}%5)*3{y})%256"),
+                format!("({bias}+(({x}%5)+5)*({x}//5)+({x}%5)*3+({x}//5)*5{y})%256"),
+                format!("({bias}+({x}%7)*({x}//7)*2+({x}%7)*11+({x}//7)*13{y})%256"),
+                format!("({bias}+({x}%7)*({x}//7)*2+({x}%7)*11+({x}//7)*17{y})%256"),
+                format!("({bias}+({x}%5)*(5-1-({x}%5))+({x}//5)+({x}%5)*3{y})%256"),
                 format!("({bias}+({x}%7)*255+({x}//7)*223+{x}*255{y})%256"),
                 format!("({bias}+({x}%2)*255+({x}//2)*223+{x}*255{y})%256"),
                 format!("({bias}+({x}//128)*255+({x}%128)*223+{x}*255{y})%256"),
@@ -2492,6 +2667,46 @@ mod tests {
         let witness = analyze_named_trivial_families(&values, 25);
         assert!(witness.named_families_excluded, "{witness:?}");
         assert!(shallow_parser_match_through_ast3(&values, 25).is_none());
+    }
+
+    #[test]
+    fn constructor_search_discovers_eight_name_independent_semantic_profiles() {
+        let report = search_constructor_templates(25);
+        assert!(report.templates_generated >= 3_300, "{report:?}");
+        assert!(report.analytically_rejected >= 300, "{report:?}");
+        assert!(report.semantic_clusters >= 8, "{report:?}");
+        assert!(
+            report
+                .survivors
+                .iter()
+                .all(|survivor| survivor.folded_expression_grammar_tokens >= 25),
+            "{report:?}"
+        );
+        assert!(
+            report
+                .survivors
+                .iter()
+                .map(|survivor| &survivor.template_family)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                >= 8,
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn constructor_semantic_profiles_ignore_modular_output_bias() {
+        let values = (0..256)
+            .map(|x| ((x % 5) * (x / 5) * 2 + (x % 5) * 17 + (x / 5) * 7) as i64 % 256)
+            .collect::<Vec<_>>();
+        let shifted = values
+            .iter()
+            .map(|value| (value + 197).rem_euclid(256))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            constructor_semantic_profile(&values, &analyze_named_trivial_families(&values, 25)),
+            constructor_semantic_profile(&shifted, &analyze_named_trivial_families(&shifted, 25))
+        );
     }
 
     #[test]

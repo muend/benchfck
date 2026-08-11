@@ -197,8 +197,13 @@ cargo test --release --test property_10k -- --ignored
    release scope is narrowed or the certificate is extended.
 3. **E3 length control.** E3 intentionally has no 3.5× ratio gate. Any E3 analysis must use
    preregistered token-matched pairs; an unmatched raw contrast is not admissible evidence.
-4. **Constructor diversity.** A search produced 450 surviving candidates but only four
-   semantic clusters. The eight-class release gate is not met.
+4. **Constructor breadth.** The bias-invariant v3 design search produced 1,838 unique
+   survivors in 51 measured semantic profiles. Eight public constructors were promoted
+   across four structural families and pass full-domain, hybrid-gate, reference, and
+   Brainfuck step-cap regressions. This closes constructor selection, not accepted-batch
+   production or external validity: a pre-optimization 8-item easy diagnostic exhausted
+   512 attempts, while the optimized rerun hit a 10-minute diagnostic timeout without a
+   batch result. Four families also remain a narrow public subset.
 5. **Unmet release work.** The 100-item batch, 10k release property run, external runs, and
    independent clean-room reproduction are outstanding.
 

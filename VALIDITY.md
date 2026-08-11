@@ -6,11 +6,12 @@ the benchmark publication-valid.
 ## Item acceptance constraints
 
 1. **Semantic program space.** The legacy affine-only five-shape grammar is
-   forbidden. Accepted programs come from eight declared semantic constructors:
-   modulus/quotient composition, parity, threshold, bit-mask equivalence,
-   multiplicative decomposition, signed decomposition, quadratic remainder,
-   and mixed product composition. A batch must contain at least eight normalized
-   classes, no affine-only class, and no class may exceed 25%.
+   forbidden. The public arity-1 subset contains eight promoted constructors across
+   residue/quotient coupling, shifted-residue coupling, residue-square, and residue-
+   complement families. A normalized class is a name-independent, complete-domain
+   profile over period class, bias-normalized affine-piece bucket, output support,
+   and modular first/second-difference support. A batch must contain at least eight
+   such classes, no affine-only class, and no class may exceed 25%.
 2. **Two density measurements.** Both executed non-movement E0 steps / all E0
    steps (`trace_semantic_density >= 0.30`) and non-movement E0 source characters
    / all E0 source characters (`text_semantic_density >= 0.35`) are mandatory.
@@ -86,11 +87,11 @@ private-set rotation event without publishing its contents, and regenerate all
 official items and answer keys. Results from different private rotations must
 be reported as separate epochs rather than silently pooled.
 
-Two additional blockers remain explicit: the hybrid nontriviality certificate
-currently supports only arity 1, and the 450 generated constructor candidates
-collapse to four measured semantic clusters rather than the eight required by
-the batch gate. Publication records these limitations; it does not alter the
-benchmark logic to hide them.
+Two limitations remain explicit: the hybrid nontriviality certificate currently
+supports only arity 1, and the eight promoted public profiles span only four
+structural families. The public subset is for development and reproduction, not
+an adequate private official-scoring population. Publication records these
+limitations; it does not alter the benchmark logic to hide them.
 
 ## Current blocking status
 
@@ -99,15 +100,23 @@ The redefined arity-one hybrid gate is operational. A private smoke for
 operator ceiling while attempting deeper levels, produced no compact analytic
 witness, and emitted `hybrid_gate_passed=true`. With verbose E3 restored, the
 smoke measured E2/E0 as 3.356 total-prompt / 3.981 program-only and E3/E0 as
-7.072 total-prompt / 8.681 program-only. The raw eight-tier diagnostic produced
-42 E0↔E2 and 41 E0↔E3 disjoint pairs within 10%.
+7.072 total-prompt / 8.681 program-only. After compiler compaction, the
+recalibrated eight-tier diagnostic produced 45 E0↔E2 and 33 E0↔E3 disjoint
+pairs within 10%.
 
-Phase 2 remains blocked while constructor proposals are promoted into IR.
+The old population blocker is closed for the public arity-1 instrument.
 Token-calibrated concrete witnesses still reject five of the eight old
 constructors (each has a 21-grammar-token affine-residue/additive-period form).
-The generated design search tested 750 templates: 300 trivial control templates
-were rejected and 450 coupled-modulus candidates survived in four measured
-semantic clusters. No survivor is yet an accepted constructor or evidence.
+The bias-invariant v3 design search tested 3,300 templates: 300 trivial controls
+were rejected and 1,838 unique candidates survived in 51 measured profiles.
+Eight candidates across four structural families were promoted to IR and pass
+complete-domain formula, hybrid-family, private-reference, and one-million-step
+Brainfuck regressions. End-to-end accepted population is still blocked: a pre-
+optimization 8-item easy diagnostic exhausted 512 attempts
+(`difficulty_band=301`, `trace_semantic_density=136`,
+`text_semantic_density=75`), and the optimized rerun reached a 10-minute timeout
+without completing. Phase 2 has not started: no 100-item accepted batch, release
+evidence, private constructor population, or external run exists.
 
 ## Required release evidence
 
