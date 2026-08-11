@@ -386,7 +386,7 @@ fn choose_input(
 ) -> Result<(Vec<u8>, crate::bf::BfRun), crate::bf::BfError> {
     let p = BfProgram::parse(e0)?;
     let mut best: Option<(u64, Vec<u8>)> = None;
-    let candidates = if arity == 1 {
+    let mut candidates = if arity == 1 {
         (1..=255u8).map(|x| vec![x]).collect::<Vec<_>>()
     } else {
         let mut rng = ChaCha20Rng::seed_from_u64(seed ^ 0xA217_17C9_5EED);
@@ -403,6 +403,8 @@ fn choose_input(
         values.extend((0..1024).map(|_| vec![rng.random::<u8>(), rng.random::<u8>()]));
         values
     };
+    let candidate_count = candidates.len();
+    candidates.rotate_left((seed % candidate_count as u64) as usize);
     for input in candidates {
         if !crate::ir::execution_profile(ir, &input, step_cap)
             .is_ok_and(|profile| profile.is_fully_exercised())
@@ -412,7 +414,11 @@ fn choose_input(
         if let Ok(run) = p.execute(&input, step_cap, false) {
             let d = run.state.steps.abs_diff(target(band));
             if best.as_ref().is_none_or(|b| d < b.0) {
-                best = Some((d, input));
+                best = Some((d, input.clone()));
+            }
+            if measured_band(run.state.steps) == band {
+                let traced = p.execute(&input, step_cap, true)?;
+                return Ok((input, traced));
             }
         }
     }
@@ -465,6 +471,24 @@ pub fn generate(spec: &BuildSpec, defaults: &Defaults) -> Result<Vec<BaseItem>, 
         };
         let mut compiled = compile(&ir, item_seed, discipline)?;
         compiled.metadata.obfuscation_passes = passes;
+        let e0_ops = compiled
+            .e0
+            .chars()
+            .filter(|c| "+-<>[],.".contains(*c))
+            .collect::<Vec<_>>();
+        let text_semantic_density = e0_ops.iter().filter(|c| !matches!(c, '>' | '<')).count()
+            as f64
+            / e0_ops.len().max(1) as f64;
+        if text_semantic_density < defaults.minimum_text_semantic_density {
+            reject!(
+                "text_semantic_density",
+                format!("text semantic density {text_semantic_density:.3}")
+            );
+        }
+        let idiom = oracle::off_idiom_rate(&compiled.e0);
+        if idiom >= defaults.off_idiom_threshold {
+            reject!("off_idiom_rate", format!("off-idiom rate {idiom:.3}"));
+        }
         let bytecode = Bytecode::from_e0_with_carrier(&compiled.e0, defaults.move_carrier)?;
         let (input, run) = match choose_input(
             &ir,
@@ -499,24 +523,6 @@ pub fn generate(spec: &BuildSpec, defaults: &Defaults) -> Result<Vec<BaseItem>, 
                 "trace_semantic_density",
                 format!("trace semantic density {trace_semantic_density:.3}")
             );
-        }
-        let e0_ops = compiled
-            .e0
-            .chars()
-            .filter(|c| "+-<>[],.".contains(*c))
-            .collect::<Vec<_>>();
-        let text_semantic_density = e0_ops.iter().filter(|c| !matches!(c, '>' | '<')).count()
-            as f64
-            / e0_ops.len().max(1) as f64;
-        if text_semantic_density < defaults.minimum_text_semantic_density {
-            reject!(
-                "text_semantic_density",
-                format!("text semantic density {text_semantic_density:.3}")
-            );
-        }
-        let idiom = oracle::off_idiom_rate(&compiled.e0);
-        if idiom >= defaults.off_idiom_threshold {
-            reject!("off_idiom_rate", format!("off-idiom rate {idiom:.3}"));
         }
         if !oracle::each_argument_sensitive(&compiled.e0, &input, defaults.step_cap)? {
             reject!(
@@ -901,6 +907,24 @@ fn public_item_metadata(item: &BaseItem, defaults: &Defaults) -> PublicItemMetad
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn choose_input_returns_first_seed_rotated_candidate_in_requested_band() {
+        let ir = Program {
+            arity: 1,
+            output_arity: 1,
+            variables: vec!["input".into()],
+            body: vec![Statement::In { dst: 0 }, Statement::Out { src: 0 }],
+        };
+
+        let (input, run) = choose_input(&ir, ",.", 1, DifficultyBand::Easy, 100, 7).unwrap();
+
+        assert_eq!(input, vec![8]);
+        assert_eq!(run.state.output, vec![8]);
+        assert_eq!(measured_band(run.state.steps), DifficultyBand::Easy);
+        assert!(!run.trace.is_empty());
+    }
+
     #[test]
     fn same_program_seed_is_structurally_stable() {
         let a = generated_program(7, 1, 0);

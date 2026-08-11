@@ -111,12 +111,14 @@ The bias-invariant v3 design search tested 3,300 templates: 300 trivial controls
 were rejected and 1,838 unique candidates survived in 51 measured profiles.
 Eight candidates across four structural families were promoted to IR and pass
 complete-domain formula, hybrid-family, private-reference, and one-million-step
-Brainfuck regressions. End-to-end accepted population is still blocked: a pre-
+Brainfuck regressions. Accepted-population throughput still blocks Phase 2: a pre-
 optimization 8-item easy diagnostic exhausted 512 attempts
 (`difficulty_band=301`, `trace_semantic_density=136`,
-`text_semantic_density=75`), and the optimized rerun reached a 10-minute timeout
-without completing. Phase 2 has not started: no 100-item accepted batch, release
-evidence, private constructor population, or external run exists.
+`text_semantic_density=75`). After deterministic in-band input short-circuiting,
+cheap-gate reordering, and an explicit CLI worker stack, a single-item diagnostic
+accepted one item after 19 rejections in 78.6 seconds. This is diagnostic progress,
+not batch evidence; no 8- or 100-item accepted batch, release evidence, private
+constructor population, or external run exists.
 
 ## Required release evidence
 

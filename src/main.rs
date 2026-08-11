@@ -249,7 +249,21 @@ fn t1_diagnostics(
     (divergence, criticality)
 }
 
+const CLI_WORKER_STACK_BYTES: usize = 16 * 1024 * 1024;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let worker = std::thread::Builder::new()
+        .name("benchfck-cli".into())
+        .stack_size(CLI_WORKER_STACK_BYTES)
+        .spawn(|| run().map_err(|error| error.to_string()))?;
+    match worker.join() {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(message)) => Err(std::io::Error::other(message).into()),
+        Err(_) => Err(std::io::Error::other("benchfck CLI worker panicked").into()),
+    }
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
         Command::Generate {
             seed,

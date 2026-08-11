@@ -202,8 +202,9 @@ cargo test --release --test property_10k -- --ignored
    across four structural families and pass full-domain, hybrid-gate, reference, and
    Brainfuck step-cap regressions. This closes constructor selection, not accepted-batch
    production or external validity: a pre-optimization 8-item easy diagnostic exhausted
-   512 attempts, while the optimized rerun hit a 10-minute diagnostic timeout without a
-   batch result. Four families also remain a narrow public subset.
+   512 attempts, while the first post-short-circuit single-item diagnostic accepted one
+   item after 19 rejections in 78.6 seconds. The 8- and 100-item throughput gates remain
+   open. Four families also remain a narrow public subset.
 5. **Unmet release work.** The 100-item batch, 10k release property run, external runs, and
    independent clean-room reproduction are outstanding.
 
