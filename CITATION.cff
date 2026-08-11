@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: >-
+  benchfck is a v0.4.0-alpha engineering candidate. No model results have been
+  published and no leaderboard exists. If you use the software mechanism,
+  please cite it using this metadata.
+title: benchfck
+type: software
+authors:
+  - family-names: Duran
+    given-names: Muhammed Enes
+    alias: muend
+version: 0.4.0-alpha
+license: Apache-2.0
+repository-code: https://github.com/muend/benchfck

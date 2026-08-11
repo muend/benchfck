@@ -1,0 +1,10 @@
+/target/
+*.jsonl
+!evidence/
+!evidence/**/*.jsonl
+/.private/
+/REVIEW-*.md
+/ROADMAP.md
+/.env
+/.env.*
+!/.env.example
