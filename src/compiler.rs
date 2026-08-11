@@ -28,7 +28,7 @@ impl Layout {
         // modulus, gate, quotient, output, inputs). Remaining variables retain
         // logical order. Disciplines permute the same compact physical span;
         // they no longer manufacture difficulty by inserting empty tape gaps.
-        let preferred = [4usize, 3, 5, 8, 7, 9, 6, 2, 0, 1, 10, 11, 12, 13, 14];
+        let preferred = [4usize, 3, 7, 5, 8, 2, 6, 0, 1, 9, 10, 11, 12, 13, 14];
         let mut logical_order = preferred
             .into_iter()
             .filter(|logical| *logical < variable_count)
@@ -246,7 +246,7 @@ impl Compiler {
             .ok_or(CompileError::NoTemporary)?;
         Ok(self.free.remove(index))
     }
-    fn alloc_variant(&mut self, variant: u8) -> Result<usize, CompileError> {
+    fn alloc_variant(&mut self, _variant: u8) -> Result<usize, CompileError> {
         if self.free.is_empty() {
             return Err(CompileError::NoTemporary);
         }
@@ -257,7 +257,11 @@ impl Compiler {
             .map(|(index, cell)| (index, self.pointer.abs_diff(*cell), *cell))
             .collect::<Vec<_>>();
         choices.sort_by_key(|(_, distance, cell)| (*distance, *cell));
-        let index = choices[usize::from(variant) % choices.len().min(3)].0;
+        // Template diversity comes from statement structure and layout. Picking
+        // a deliberately farther scratch cell only adds pointer traffic and can
+        // make source density a compiler-allocation artifact, so always use the
+        // nearest available temporary (with cell index as deterministic tie-break).
+        let index = choices[0].0;
         Ok(self.free.remove(index))
     }
     fn release(&mut self, x: usize) {
@@ -367,49 +371,23 @@ impl Compiler {
         match s {
             Set { dst, value } => {
                 let d = self.cell(*dst)?;
-                if variant < 2 {
-                    self.clear(d, variant);
-                    self.delta(d, *value, variant);
-                } else {
-                    let t = self.alloc_variant(variant)?;
-                    self.clear(d, variant);
-                    self.clear(t, variant);
-                    self.delta(t, *value, variant);
-                    self.move_to(t);
-                    self.emit('[');
-                    self.emit('-');
-                    self.move_to(d);
-                    self.emit('+');
-                    self.move_to(t);
-                    self.emit(']');
-                    self.release(t);
-                }
+                // A constant assignment has no data dependency that benefits
+                // from staging through a scratch cell. Emit it in place; the
+                // clear/delta direction still follows the selected template.
+                self.clear(d, variant);
+                self.delta(d, *value, variant);
             }
             Copy { dst, src } => {
                 let d = self.cell(*dst)?;
                 let x = self.cell(*src)?;
                 if d != x {
                     let t = self.alloc_variant(variant)?;
-                    if variant == 0 {
+                    if variant.is_multiple_of(2) {
                         self.copy_core(d, x, t, false);
-                        self.release(t);
-                    } else if variant == 1 {
-                        self.copy_core_alt(d, x, t, false);
-                        self.release(t);
                     } else {
-                        let r = self.alloc_variant(variant)?;
-                        self.copy_core(t, x, r, false);
-                        self.clear(d, variant);
-                        self.move_to(t);
-                        self.emit('[');
-                        self.emit('-');
-                        self.move_to(d);
-                        self.emit('+');
-                        self.move_to(t);
-                        self.emit(']');
-                        self.release(r);
-                        self.release(t);
+                        self.copy_core_alt(d, x, t, false);
                     }
+                    self.release(t);
                 }
             }
             Add { dst, src } | Sub { dst, src } => {

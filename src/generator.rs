@@ -26,7 +26,8 @@ pub struct BuildSpec {
 }
 
 pub const PROGRAM_SIZE_TIERS: u8 = 8;
-const SIZE_TIER_WORK_ROUNDS: [usize; PROGRAM_SIZE_TIERS as usize] = [0, 3, 6, 7, 13, 17, 25, 35];
+const CONSTRUCTOR_VARIABLES: usize = 9;
+const SIZE_TIER_WORK_ROUNDS: [usize; PROGRAM_SIZE_TIERS as usize] = [0, 3, 6, 12, 17, 22, 31, 41];
 
 #[derive(Debug, Error)]
 pub enum GenerateError {
@@ -78,35 +79,59 @@ struct GeneratedCase {
 }
 
 fn mod_div_block(body: &mut Vec<Statement>, src: usize, modulus: u8) {
-    // Scratch layout: counter=3, one=4, remainder=5, quotient=6,
-    // modulus=7, difference=8, zero-test gate=9.
+    // Scratch layout: counter=3, remainder=5, quotient=6,
+    // modulus/zero-test gate=7, difference=8. The modulus cell is refreshed
+    // before subtraction and then reused as the gate, keeping the live set to
+    // nine variables without changing the loop semantics.
     body.extend([
         Statement::Copy { dst: 3, src },
-        Statement::Set { dst: 4, value: 1 },
         Statement::Set { dst: 5, value: 0 },
         Statement::Set { dst: 6, value: 0 },
-        Statement::Set {
-            dst: 7,
-            value: modulus,
-        },
         Statement::While {
             cond: 3,
             class: LoopClass::S1,
             body: vec![
-                Statement::Sub { dst: 3, src: 4 },
-                Statement::Add { dst: 5, src: 4 },
+                Statement::Set { dst: 7, value: 1 },
+                Statement::DrainScaled {
+                    dst: 3,
+                    src: 7,
+                    factor: 1,
+                    subtract: true,
+                },
+                Statement::Set { dst: 7, value: 1 },
+                Statement::DrainScaled {
+                    dst: 5,
+                    src: 7,
+                    factor: 1,
+                    subtract: false,
+                },
                 Statement::Copy { dst: 8, src: 5 },
-                Statement::Sub { dst: 8, src: 7 },
-                Statement::Set { dst: 9, value: 1 },
+                Statement::Set {
+                    dst: 7,
+                    value: modulus,
+                },
+                Statement::DrainScaled {
+                    dst: 8,
+                    src: 7,
+                    factor: 1,
+                    subtract: true,
+                },
+                Statement::Set { dst: 7, value: 1 },
                 Statement::IfNonZeroDrain {
                     cond: 8,
-                    body: vec![Statement::Set { dst: 9, value: 0 }],
+                    body: vec![Statement::Set { dst: 7, value: 0 }],
                 },
                 Statement::IfNonZeroDrain {
-                    cond: 9,
+                    cond: 7,
                     body: vec![
                         Statement::Set { dst: 5, value: 0 },
-                        Statement::Add { dst: 6, src: 4 },
+                        Statement::Set { dst: 7, value: 1 },
+                        Statement::DrainScaled {
+                            dst: 6,
+                            src: 7,
+                            factor: 1,
+                            subtract: false,
+                        },
                     ],
                 },
             ],
@@ -123,13 +148,83 @@ fn add_scaled(body: &mut Vec<Statement>, dst: usize, src: usize, count: usize, s
     });
 }
 
-/// Eight terminating semantic constructors. The old five implementation
-/// shapes all collapsed to one affine family and are deliberately absent.
-/// Every constructor includes a closed-form counterpart in the independent
-/// bounded expression grammar used by the independent G2 nontriviality search.
+fn multiply_into(body: &mut Vec<Statement>, dst: usize, left: usize, right: usize) {
+    // mod_div_block has finished when multiplication begins, so its counter
+    // and one cells can be reused. Keeping the live set compact materially
+    // reduces Brainfuck pointer traffic across every compiler layout.
+    const COUNTER: usize = 3;
+    const ONE: usize = 4;
+    body.extend([
+        Statement::Copy {
+            dst: COUNTER,
+            src: left,
+        },
+        Statement::Set { dst: ONE, value: 1 },
+        Statement::Set { dst, value: 0 },
+        Statement::While {
+            cond: COUNTER,
+            class: LoopClass::S1,
+            body: vec![
+                Statement::Sub {
+                    dst: COUNTER,
+                    src: ONE,
+                },
+                Statement::Add { dst, src: right },
+            ],
+        },
+    ]);
+}
+
+fn multiply_into_consuming_left(body: &mut Vec<Statement>, dst: usize, left: usize, right: usize) {
+    const COUNTER: usize = 3;
+    body.extend([
+        Statement::Copy {
+            dst: COUNTER,
+            src: left,
+        },
+        Statement::Set { dst, value: 0 },
+        Statement::While {
+            cond: COUNTER,
+            class: LoopClass::S1,
+            body: vec![
+                Statement::Set {
+                    dst: left,
+                    value: 1,
+                },
+                Statement::DrainScaled {
+                    dst: COUNTER,
+                    src: left,
+                    factor: 1,
+                    subtract: true,
+                },
+                Statement::Add { dst, src: right },
+            ],
+        },
+    ]);
+}
+
+fn add_constant(body: &mut Vec<Statement>, dst: usize, value: u8) {
+    const CONSTANT: usize = 8;
+    body.extend([
+        Statement::Set {
+            dst: CONSTANT,
+            value,
+        },
+        Statement::DrainScaled {
+            dst,
+            src: CONSTANT,
+            factor: 1,
+            subtract: false,
+        },
+    ]);
+}
+
+/// Eight terminating constructors promoted from the generated v3 template
+/// search. Each occupies a distinct name-independent semantic profile over the
+/// complete 256-input domain and survives the calibrated hybrid T2 gate.
 fn generated_program(seed: u64, arity: u8, size_tier: u8) -> GeneratedCase {
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
-    let bias = rng.random_range(112..=127);
+    let bias = rng.random::<u8>();
     let mut body = vec![Statement::In { dst: 0 }];
     if arity == 2 {
         body.push(Statement::In { dst: 1 });
@@ -140,109 +235,74 @@ fn generated_program(seed: u64, arity: u8, size_tier: u8) -> GeneratedCase {
     });
     let shape = match seed % 8 {
         0 => {
-            mod_div_block(&mut body, 0, 7);
-            add_scaled(&mut body, 2, 5, 255, false);
-            add_scaled(&mut body, 2, 6, 223, false);
-            "modulus_quotient_composition"
+            mod_div_block(&mut body, 0, 5);
+            body.push(Statement::Copy { dst: 7, src: 5 });
+            add_constant(&mut body, 7, 1);
+            multiply_into_consuming_left(&mut body, 8, 7, 6);
+            add_scaled(&mut body, 2, 8, 1, false);
+            add_scaled(&mut body, 2, 5, 3, false);
+            add_scaled(&mut body, 2, 6, 5, false);
+            "shifted_residue_p5_s1"
         }
         1 => {
-            mod_div_block(&mut body, 0, 2);
-            add_scaled(&mut body, 2, 5, 255, false);
-            add_scaled(&mut body, 2, 6, 223, false);
-            "parity_quotient_composition"
+            mod_div_block(&mut body, 0, 5);
+            multiply_into(&mut body, 8, 5, 5);
+            add_scaled(&mut body, 2, 8, 11, false);
+            add_scaled(&mut body, 2, 6, 3, false);
+            add_scaled(&mut body, 2, 5, 1, false);
+            "residue_square_p5_c11"
         }
         2 => {
-            mod_div_block(&mut body, 0, 128);
-            add_scaled(&mut body, 2, 6, 255, false);
-            add_scaled(&mut body, 2, 5, 223, false);
-            "threshold_composition"
+            mod_div_block(&mut body, 0, 7);
+            multiply_into(&mut body, 8, 5, 6);
+            add_scaled(&mut body, 2, 8, 5, false);
+            add_scaled(&mut body, 2, 5, 11, false);
+            add_scaled(&mut body, 2, 6, 17, false);
+            "residue_quotient_p7_c5_r11_q17"
         }
         3 => {
-            mod_div_block(&mut body, 0, 16);
-            add_scaled(&mut body, 2, 5, 255, false);
-            add_scaled(&mut body, 2, 6, 223, false);
-            "bitmask_quotient_composition"
+            mod_div_block(&mut body, 0, 5);
+            multiply_into(&mut body, 8, 5, 5);
+            add_scaled(&mut body, 2, 8, 1, true);
+            add_scaled(&mut body, 2, 6, 3, false);
+            add_scaled(&mut body, 2, 5, 7, false);
+            "residue_complement_p5_q3"
         }
         4 => {
-            mod_div_block(&mut body, 0, 7);
-            body.extend([
-                Statement::Copy { dst: 10, src: 5 },
-                Statement::Copy { dst: 11, src: 6 },
-                Statement::Copy { dst: 12, src: 10 },
-                Statement::Set { dst: 13, value: 1 },
-                Statement::Set { dst: 14, value: 0 },
-                Statement::While {
-                    cond: 12,
-                    class: LoopClass::S1,
-                    body: vec![
-                        Statement::Sub { dst: 12, src: 13 },
-                        Statement::Add { dst: 14, src: 11 },
-                    ],
-                },
-                Statement::DrainScaled {
-                    dst: 2,
-                    src: 14,
-                    factor: 255,
-                    subtract: false,
-                },
-            ]);
-            add_scaled(&mut body, 2, 11, 223, false);
-            "multiplicative_decomposition"
+            mod_div_block(&mut body, 0, 5);
+            // Expanded form of (r + 5)q + 3r + 5q. Computing rq + 3r + 10q
+            // avoids manufacturing pointer traffic for the constant shift.
+            multiply_into(&mut body, 8, 5, 6);
+            add_scaled(&mut body, 2, 8, 1, false);
+            add_scaled(&mut body, 2, 5, 3, false);
+            add_scaled(&mut body, 2, 6, 10, false);
+            "shifted_residue_p5_s5"
         }
         5 => {
-            mod_div_block(&mut body, 0, 5);
-            add_scaled(&mut body, 2, 5, 255, false);
-            add_scaled(&mut body, 2, 6, 223, true);
-            "signed_modulus_quotient"
+            mod_div_block(&mut body, 0, 7);
+            multiply_into(&mut body, 8, 5, 6);
+            add_scaled(&mut body, 2, 8, 2, false);
+            add_scaled(&mut body, 2, 5, 11, false);
+            add_scaled(&mut body, 2, 6, 13, false);
+            "residue_quotient_p7_c2_r11_q13"
         }
         6 => {
-            mod_div_block(&mut body, 0, 5);
-            body.extend([
-                Statement::Copy { dst: 10, src: 5 },
-                Statement::Copy { dst: 11, src: 6 },
-                Statement::Copy { dst: 12, src: 10 },
-                Statement::Set { dst: 13, value: 1 },
-                Statement::Set { dst: 14, value: 0 },
-                Statement::While {
-                    cond: 12,
-                    class: LoopClass::S1,
-                    body: vec![
-                        Statement::Sub { dst: 12, src: 13 },
-                        Statement::Add { dst: 14, src: 10 },
-                    ],
-                },
-            ]);
-            add_scaled(&mut body, 2, 14, 255, false);
-            add_scaled(&mut body, 2, 10, 223, false);
-            add_scaled(&mut body, 2, 11, 191, false);
-            "quadratic_remainder_composition"
+            mod_div_block(&mut body, 0, 7);
+            multiply_into(&mut body, 8, 5, 6);
+            add_scaled(&mut body, 2, 8, 2, false);
+            add_scaled(&mut body, 2, 5, 11, false);
+            add_scaled(&mut body, 2, 6, 17, false);
+            "residue_quotient_p7_c2_r11_q17"
         }
         _ => {
-            mod_div_block(&mut body, 0, 3);
-            body.extend([
-                Statement::Copy { dst: 10, src: 5 },
-                Statement::Copy { dst: 11, src: 6 },
-                Statement::Copy { dst: 12, src: 10 },
-                Statement::Set { dst: 13, value: 1 },
-                Statement::Set { dst: 14, value: 0 },
-                Statement::While {
-                    cond: 12,
-                    class: LoopClass::S1,
-                    body: vec![
-                        Statement::Sub { dst: 12, src: 13 },
-                        Statement::Add { dst: 14, src: 11 },
-                    ],
-                },
-            ]);
-            add_scaled(&mut body, 2, 14, 255, false);
-            add_scaled(&mut body, 2, 10, 223, false);
-            add_scaled(&mut body, 2, 11, 191, true);
-            "mixed_product_composition"
+            mod_div_block(&mut body, 0, 5);
+            multiply_into(&mut body, 8, 5, 5);
+            add_scaled(&mut body, 2, 8, 1, true);
+            add_scaled(&mut body, 2, 6, 1, false);
+            add_scaled(&mut body, 2, 5, 7, false);
+            "residue_complement_p5_q1"
         }
     };
-    // A third independent semantic channel raises trace density without
-    // inserting no-ops: the original input remains live after div/mod and is
-    // consumed into the nonlinear output here.
     // Controlled program-size ladder. Each tier adds an executed reversible
     // workload: two independent copies of an input are accumulated into the
     // output with the same factor and opposite signs. This changes state and
@@ -251,7 +311,7 @@ fn generated_program(seed: u64, arity: u8, size_tier: u8) -> GeneratedCase {
     let size_tier = size_tier.min(PROGRAM_SIZE_TIERS - 1);
     let work_rounds = SIZE_TIER_WORK_ROUNDS[size_tier as usize];
     for round in 0..work_rounds {
-        let addend = 15 + round * 2;
+        let addend = CONSTRUCTOR_VARIABLES + round * 2;
         let subtrahend = addend + 1;
         let src = round % arity as usize;
         let factor = 17;
@@ -275,7 +335,6 @@ fn generated_program(seed: u64, arity: u8, size_tier: u8) -> GeneratedCase {
             },
         ]);
     }
-    add_scaled(&mut body, 2, 0, 255, false);
     if arity == 2 {
         add_scaled(&mut body, 2, 1, 197 + (seed as usize % 3) * 6, false);
     }
@@ -284,7 +343,9 @@ fn generated_program(seed: u64, arity: u8, size_tier: u8) -> GeneratedCase {
         program: Program {
             arity,
             output_arity: 1,
-            variables: (0..15 + work_rounds * 2).map(|i| format!("v{i}")).collect(),
+            variables: (0..CONSTRUCTOR_VARIABLES + work_rounds * 2)
+                .map(|i| format!("v{i}"))
+                .collect(),
             body,
         },
         shape,
@@ -552,7 +613,7 @@ pub fn generate(spec: &BuildSpec, defaults: &Defaults) -> Result<Vec<BaseItem>, 
             );
         };
         nontriviality_witness.reference_search_algorithm =
-            "constructor-independent_G2_reference_only_v1".into();
+            "declared_family_G2_reference_only_v2".into();
         nontriviality_witness.reference_candidates_enumerated = reference.candidates_enumerated;
         nontriviality_witness.reference_candidates_full_domain_checked =
             reference.candidates_full_domain_checked;
@@ -900,6 +961,142 @@ mod tests {
     }
 
     #[test]
+    fn promoted_constructors_match_their_selected_closed_forms() {
+        for seed in 0..8u64 {
+            let generated = generated_program(seed, 1, 0);
+            let bias = generated
+                .program
+                .body
+                .iter()
+                .find_map(|statement| match statement {
+                    Statement::Set { dst: 2, value } => Some(u32::from(*value)),
+                    _ => None,
+                })
+                .unwrap();
+            for input in 0..=255u8 {
+                let x = u32::from(input);
+                let expected = match seed % 8 {
+                    0 => {
+                        let r = x % 5;
+                        let q = x / 5;
+                        bias + (r + 1) * q + r * 3 + q * 5
+                    }
+                    1 => {
+                        let r = x % 5;
+                        let q = x / 5;
+                        bias + r * r * 11 + q * 3 + r
+                    }
+                    2 => {
+                        let r = x % 7;
+                        let q = x / 7;
+                        bias + r * q * 5 + r * 11 + q * 17
+                    }
+                    3 => {
+                        let r = x % 5;
+                        let q = x / 5;
+                        bias + r * (4 - r) + q * 3 + r * 3
+                    }
+                    4 => {
+                        let r = x % 5;
+                        let q = x / 5;
+                        bias + (r + 5) * q + r * 3 + q * 5
+                    }
+                    5 => {
+                        let r = x % 7;
+                        let q = x / 7;
+                        bias + r * q * 2 + r * 11 + q * 13
+                    }
+                    6 => {
+                        let r = x % 7;
+                        let q = x / 7;
+                        bias + r * q * 2 + r * 11 + q * 17
+                    }
+                    _ => {
+                        let r = x % 5;
+                        let q = x / 5;
+                        bias + r * (4 - r) + q + r * 3
+                    }
+                } as u8;
+                let actual = crate::ir::execute(&generated.program, &[input], 1_000_000)
+                    .unwrap()
+                    .output[0];
+                assert_eq!(actual, expected, "shape={} input={input}", generated.shape);
+            }
+        }
+    }
+
+    #[test]
+    fn promoted_constructors_occupy_eight_hybrid_safe_semantic_profiles() {
+        let mut profiles = std::collections::BTreeSet::new();
+        for seed in 0..8u64 {
+            let generated = generated_program(seed, 1, 0);
+            let values = (0..=255u8)
+                .map(|input| {
+                    i64::from(
+                        crate::ir::execute(&generated.program, &[input], 1_000_000)
+                            .unwrap()
+                            .output[0],
+                    )
+                })
+                .collect::<Vec<_>>();
+            let analytical = tasks::analyze_named_trivial_families(&values, 25);
+            assert!(
+                analytical.named_families_excluded,
+                "shape={} analytical={analytical:?}",
+                generated.shape
+            );
+            profiles.insert(tasks::constructor_semantic_profile(&values, &analytical));
+        }
+        assert_eq!(profiles.len(), 8, "profiles={profiles:#?}");
+    }
+
+    #[test]
+    fn promoted_constructors_have_private_reference_search_witnesses() {
+        for seed in 0..8u64 {
+            let generated = generated_program(seed, 1, 0);
+            let (program, _) = structural_obfuscate(&generated.program, seed);
+            let compiled = compile(&program, seed, LayoutDiscipline::Contiguous).unwrap();
+            let mut hasher = Sha256::new();
+            for input in 0..=255u8 {
+                let binding = [input];
+                let output = crate::ir::execute(&program, &binding, 1_000_000)
+                    .unwrap()
+                    .output;
+                hasher.update((binding.len() as u32).to_le_bytes());
+                hasher.update(binding);
+                hasher.update((output.len() as u32).to_le_bytes());
+                hasher.update(output);
+            }
+            let target = crate::oracle::SemanticFingerprint {
+                algorithm: "sha256_length_delimited_domain_table".into(),
+                domain_size: 256,
+                digest_hex: crate::lower_hex(&hasher.finalize()),
+            };
+            let bf = BfProgram::parse(&compiled.e0).unwrap();
+            for input in [0u8, 1, 2, 17, 63, 127, 254, 255] {
+                let expected = crate::ir::execute(&program, &[input], 1_000_000)
+                    .unwrap()
+                    .output;
+                let actual = bf
+                    .execute(&[input], 1_000_000, false)
+                    .unwrap_or_else(|error| {
+                        panic!("shape={} input={input} BF error={error}", generated.shape)
+                    })
+                    .state
+                    .output;
+                assert_eq!(actual, expected, "shape={} input={input}", generated.shape);
+            }
+            let reference =
+                tasks::search_g2_reference_expression(&compiled.e0, 1, &target, 1_000_000);
+            assert!(
+                reference.is_some(),
+                "shape={} had no private reference witness",
+                generated.shape
+            );
+        }
+    }
+
+    #[test]
     fn all_size_tiers_preserve_the_complete_arity_one_function() {
         for seed in 0..8u64 {
             let baseline = generated_program(seed, 1, 0).program;
@@ -956,7 +1153,10 @@ mod tests {
             e2: u64,
             e3: u64,
         }
-        fn count_pairs(observations: &[Observation], encoded: fn(Observation) -> u64) -> usize {
+        fn count_pairs(
+            observations: &[Observation],
+            encoded: fn(Observation) -> u64,
+        ) -> (usize, std::collections::BTreeMap<(u8, u8), usize>) {
             let mut candidates = Vec::new();
             for (left_index, left) in observations.iter().copied().enumerate() {
                 for (right_index, right) in observations.iter().copied().enumerate() {
@@ -974,16 +1174,20 @@ mod tests {
             candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
             let mut used = std::collections::HashSet::new();
             let mut count = 0;
+            let mut tier_pairs = std::collections::BTreeMap::new();
             for (_, left, right) in candidates {
                 if used.insert(left) {
                     if used.insert(right) {
                         count += 1;
+                        *tier_pairs
+                            .entry((observations[left].tier, observations[right].tier))
+                            .or_default() += 1;
                     } else {
                         used.remove(&left);
                     }
                 }
             }
-            count
+            (count, tier_pairs)
         }
 
         let mut observations = Vec::new();
@@ -1007,9 +1211,11 @@ mod tests {
                 e3: tasks::bpe_token_count(&bytecode.e3_source(), "cl100k_base").unwrap(),
             });
         }
-        let e2_pairs = count_pairs(&observations, |observation| observation.e2);
-        let e3_pairs = count_pairs(&observations, |observation| observation.e3);
-        println!("raw_token_matched_pairs e2={e2_pairs} e3={e3_pairs}");
+        let (e2_pairs, e2_tiers) = count_pairs(&observations, |observation| observation.e2);
+        let (e3_pairs, e3_tiers) = count_pairs(&observations, |observation| observation.e3);
+        println!(
+            "raw_token_matched_pairs e2={e2_pairs} e3={e3_pairs} e2_tiers={e2_tiers:?} e3_tiers={e3_tiers:?}"
+        );
         assert!(e2_pairs >= 30, "only {e2_pairs} raw E0/E2 pairs");
         assert!(e3_pairs >= 30, "only {e3_pairs} raw E0/E3 pairs");
     }
@@ -1037,6 +1243,7 @@ mod tests {
 
     #[test]
     fn generated_e0_text_density_meets_the_validity_floor() {
+        let mut violations = Vec::new();
         for seed in 0..8 {
             let raw = generated_program(seed, 1, 0);
             for discipline in [
@@ -1053,12 +1260,14 @@ mod tests {
                 let density = ops.iter().filter(|ch| !matches!(ch, '>' | '<')).count() as f64
                     / ops.len() as f64;
                 let semantic = ops.iter().filter(|ch| !matches!(ch, '>' | '<')).count();
-                assert!(
-                    density >= 0.35,
-                    "seed={seed} layout={discipline:?} density={density:.3} semantic={semantic} total={}",
-                    ops.len()
-                );
+                if density < 0.35 {
+                    violations.push(format!(
+                        "seed={seed} layout={discipline:?} density={density:.3} semantic={semantic} total={}",
+                        ops.len()
+                    ));
+                }
             }
         }
+        assert!(violations.is_empty(), "{}", violations.join("\n"));
     }
 }
