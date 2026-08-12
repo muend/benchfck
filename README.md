@@ -197,8 +197,11 @@ cargo test --release --test property_10k -- --ignored
    release scope is narrowed or the certificate is extended.
 3. **E3 length control.** E3 intentionally has no 3.5× ratio gate. Any E3 analysis must use
    preregistered token-matched pairs; an unmatched raw contrast is not admissible evidence.
-4. **Constructor breadth.** The bias-invariant v3 design search produced 1,838 unique
-   survivors in 51 measured semantic profiles. Eight public constructors were promoted
+4. **Constructor breadth.** The bias-invariant v4 design search produced 1,730 unique
+   semantic functions in 51 coarse profile buckets, correcting a 108-record overcount
+   caused by adjacent-only deduplication.
+   The largest bucket contains 250 functions, so profile count is not a count of independent
+   semantic classes. Eight public constructors were promoted
    across four structural families and pass full-domain, hybrid-gate, reference, and
    Brainfuck step-cap regressions. This closes constructor selection, not accepted-batch
    production or external validity: a pre-optimization 8-item easy diagnostic exhausted
