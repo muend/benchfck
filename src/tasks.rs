@@ -1479,7 +1479,22 @@ pub struct ConstructorSearchReport {
     pub requested_exact_ast_depth: u8,
     pub proven_exhaustive_ast_depth: u8,
     pub semantic_clusters: usize,
+    pub clustering_audit: ConstructorClusteringAudit,
     pub survivors: Vec<ConstructorSearchSurvivor>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ConstructorClusteringAudit {
+    pub profile_kind: String,
+    pub candidate_records_before_global_dedup: usize,
+    pub records_after_adjacent_only_dedup: usize,
+    pub duplicate_semantic_records_removed: usize,
+    pub nonadjacent_duplicates_previously_missed: usize,
+    pub unique_semantic_functions: usize,
+    pub profile_buckets: usize,
+    pub singleton_profile_buckets: usize,
+    pub largest_profile_bucket: usize,
+    pub mixed_template_family_profile_buckets: usize,
 }
 
 fn expression_values(expression: &str) -> Option<Vec<i64>> {
@@ -1801,14 +1816,57 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
         (&left.semantic_cluster, &left.expression)
             .cmp(&(&right.semantic_cluster, &right.expression))
     });
-    survivors.dedup_by(|left, right| left.semantic_digest_hex == right.semantic_digest_hex);
-    let semantic_clusters = survivors
-        .iter()
-        .map(|survivor| &survivor.semantic_cluster)
-        .collect::<std::collections::BTreeSet<_>>()
-        .len();
+    let candidate_records_before_global_dedup = survivors.len();
+    let records_after_adjacent_only_dedup = {
+        let mut previous_digest = None;
+        let mut records = 0;
+        for survivor in &survivors {
+            if previous_digest != Some(survivor.semantic_digest_hex.as_str()) {
+                records += 1;
+                previous_digest = Some(survivor.semantic_digest_hex.as_str());
+            }
+        }
+        records
+    };
+    let mut seen_semantic_digests = std::collections::BTreeSet::new();
+    survivors.retain(|survivor| seen_semantic_digests.insert(survivor.semantic_digest_hex.clone()));
+    let mut profile_members =
+        std::collections::BTreeMap::<String, (usize, std::collections::BTreeSet<String>)>::new();
+    for survivor in &survivors {
+        let entry = profile_members
+            .entry(survivor.semantic_cluster.clone())
+            .or_default();
+        entry.0 += 1;
+        entry.1.insert(survivor.template_family.clone());
+    }
+    let semantic_clusters = profile_members.len();
+    let clustering_audit = ConstructorClusteringAudit {
+        profile_kind: "coarse_bucket_signature_not_distance_cluster".into(),
+        candidate_records_before_global_dedup,
+        records_after_adjacent_only_dedup,
+        duplicate_semantic_records_removed: candidate_records_before_global_dedup - survivors.len(),
+        nonadjacent_duplicates_previously_missed: records_after_adjacent_only_dedup
+            - survivors.len(),
+        unique_semantic_functions: survivors.len(),
+        profile_buckets: semantic_clusters,
+        singleton_profile_buckets: profile_members
+            .values()
+            .filter(|(members, _)| *members == 1)
+            .count(),
+        largest_profile_bucket: profile_members
+            .values()
+            .map(|(members, _)| *members)
+            .max()
+            .unwrap_or(0),
+        mixed_template_family_profile_buckets: profile_members
+            .values()
+            .filter(|(_, families)| families.len() > 1)
+            .count(),
+    };
     ConstructorSearchReport {
-        algorithm: "generated_coprime_template_grid_bias_invariant_profile_exact_ast3_v3".into(),
+        algorithm:
+            "generated_coprime_template_grid_bias_invariant_profile_exact_ast3_global_dedup_v4"
+                .into(),
         folded_expression_grammar_token_threshold_exclusive: threshold_exclusive,
         templates_generated,
         analytically_rejected,
@@ -1817,6 +1875,7 @@ pub fn search_constructor_templates(threshold_exclusive: u32) -> ConstructorSear
         requested_exact_ast_depth: 7,
         proven_exhaustive_ast_depth: 3,
         semantic_clusters,
+        clustering_audit,
         survivors,
     }
 }
@@ -2675,6 +2734,47 @@ mod tests {
         assert!(report.templates_generated >= 3_300, "{report:?}");
         assert!(report.analytically_rejected >= 300, "{report:?}");
         assert!(report.semantic_clusters >= 8, "{report:?}");
+        assert_eq!(report.survivors.len(), 1_730, "{report:?}");
+        assert_eq!(
+            report
+                .survivors
+                .iter()
+                .map(|survivor| &survivor.semantic_digest_hex)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            report.survivors.len(),
+            "{report:?}"
+        );
+        assert_eq!(report.clustering_audit.unique_semantic_functions, 1_730);
+        assert_eq!(
+            report
+                .clustering_audit
+                .candidate_records_before_global_dedup,
+            3_000
+        );
+        assert_eq!(
+            report.clustering_audit.records_after_adjacent_only_dedup,
+            1_838
+        );
+        assert_eq!(
+            report.clustering_audit.duplicate_semantic_records_removed,
+            1_270
+        );
+        assert_eq!(
+            report
+                .clustering_audit
+                .nonadjacent_duplicates_previously_missed,
+            108
+        );
+        assert_eq!(report.clustering_audit.profile_buckets, 51);
+        assert_eq!(report.clustering_audit.singleton_profile_buckets, 7);
+        assert_eq!(report.clustering_audit.largest_profile_bucket, 250);
+        assert_eq!(
+            report
+                .clustering_audit
+                .mixed_template_family_profile_buckets,
+            30
+        );
         assert!(
             report
                 .survivors

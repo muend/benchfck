@@ -107,8 +107,13 @@ pairs within 10%.
 The old population blocker is closed for the public arity-1 instrument.
 Token-calibrated concrete witnesses still reject five of the eight old
 constructors (each has a 21-grammar-token affine-residue/additive-period form).
-The bias-invariant v3 design search tested 3,300 templates: 300 trivial controls
-were rejected and 1,838 unique candidates survived in 51 measured profiles.
+The bias-invariant v4 design search tested 3,300 templates: 300 trivial controls
+were rejected and global digest deduplication left 1,730 unique semantic functions
+in 51 coarse profile buckets. The audit corrected a 108-record overcount; seven buckets
+are singletons, 30 mix multiple template families, and the largest contains 250
+functions. More precisely, global deduplication removes 1,270 of 3,000 filtered
+candidate records; the previous adjacent-only pass removed 1,162 and missed 108.
+These buckets are diagnostic signatures, not independent semantic classes.
 Eight candidates across four structural families were promoted to IR and pass
 complete-domain formula, hybrid-family, private-reference, and one-million-step
 Brainfuck regressions. Accepted-population throughput still blocks Phase 2: a pre-
