@@ -25,7 +25,11 @@ pub fn lower_hex(bytes: &[u8]) -> String {
     output
 }
 
-pub const PINNED_SEMANTICS: &str = "cell = 8-bit unsigned, wraps at 255→0 and 0→255\ntape = 30,000 cells, pointer starts at 0, moving left of 0 is a hard error\n`,` on exhausted input sets the cell to 0\nstep cap = 1,000,000; exceeding it classifies the run as `NON_TERMINATING`";
+/// F16: 600 production-schedule candidates measured a maximum 255-input E0
+/// runtime of 5,678,676 steps at tier 9. Eight million leaves 40.9% margin.
+pub const PINNED_STEP_CAP: u64 = 8_000_000;
+
+pub const PINNED_SEMANTICS: &str = "cell = 8-bit unsigned, wraps at 255→0 and 0→255\ntape = 30,000 cells, pointer starts at 0, moving left of 0 is a hard error\n`,` on exhausted input sets the cell to 0\nstep cap = 8,000,000; exceeding it classifies the run as `NON_TERMINATING`";
 
 #[cfg(test)]
 mod tests {

@@ -14,7 +14,9 @@ trace_demand = "probe_based"
 # PENDING DECISION: pointer volatility is measured, not generated directly.
 pointer_volatility_as_covariate = true
 # PENDING DECISION: executions beyond this are NON_TERMINATING.
-step_cap = 1000000
+# F16: 600 production-schedule candidates measured max 255-input E0 runtime
+# 5,678,676 at tier 9. 8M leaves 40.9% margin and is pinned in every prompt.
+step_cap = 8000000
 # Large programs may sample positions, but never fewer than this.
 minimum_avalanche_positions = 64
 # Canonical-idiom matches divided by BF length must remain below this value.
@@ -24,13 +26,17 @@ off_idiom_threshold = 0.08
 move_carrier = "rle"
 # Executed E0 steps that are not pointer movement must meet this floor.
 minimum_trace_semantic_density = 0.30
-# Non-movement E0 source characters divided by total E0 source characters.
-minimum_text_semantic_density = 0.35
-# E2 remains a compact explicit-addressing rung and is compared with its matched
-# E0 prompt. E3 is intentionally verbose and is controlled only by preregistered
-# token-matched pairs, not by this acceptance ratio.
+# D32: source-text semantic density has NO floor. It decays monotonically with
+# program size (0.46 at tier 0 to 0.076 at tier 7), so any floor selects on
+# length; a 0.35 floor admitted only tiers 0-1, whose E0 token range is disjoint
+# from the E2 range, leaving the encoding effect unidentified by any method. The
+# value is recorded per item and is a required control in size-tier analysis.
+# D28: neither E2/E0 nor E3/E0 is an acceptance gate. Both prompt-BPE ratios are
+# recorded as mandatory covariates and the H1 contrast is measured on
+# preregistered token-matched pairs (D15), which control the confound rather
+# than shrinking it. A ratio ceiling here would also silently bias the accepted
+# population against the larger size tiers.
 prompt_tokenizer = "cl100k_base"
-maximum_e2_prompt_bpe_ratio = 3.5
 # Static exports contain several deterministic interior probes per encoding.
 t1_probe_count = 3
 # Fold constant-only subexpressions, then apply this restricted-grammar EXPR

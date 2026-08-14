@@ -1,5 +1,5 @@
 use crate::{
-    PINNED_SEMANTICS,
+    PINNED_SEMANTICS, PINNED_STEP_CAP,
     backend::Bytecode,
     bf::BfProgram,
     oracle::Observable,
@@ -73,6 +73,31 @@ fn prompt_header() -> String {
     format!("Pinned execution semantics (apply exactly):\n{PINNED_SEMANTICS}\n\n")
 }
 
+/// D33: the implicit-encoding trace is never stored. It is a deterministic
+/// function of `e0` and `input`, and storing it dominated private export size
+/// (~17 MB per item at ~200k steps, and the size ladder pushes step counts far
+/// higher). Probes are recomputed on demand with O(1) extra memory.
+///
+/// Step semantics mirror `bf::TracePoint` exactly: `touched_cell` is the
+/// pointer *before* the instruction ran, `pointer` is the pointer after it, and
+/// `value` is that touched cell's value after the instruction.
+fn implicit_probe_answer(item: &BaseItem, step: u64) -> Option<T1Answer> {
+    let program = BfProgram::parse(&item.encodings.e0).ok()?;
+    let before = program
+        .state_after(&item.input, step.checked_sub(1)?, PINNED_STEP_CAP)
+        .ok()?;
+    let after = program
+        .state_after(&item.input, step, PINNED_STEP_CAP)
+        .ok()?;
+    let touched = before.pointer;
+    Some(T1Answer {
+        step,
+        pointer: Some(after.pointer),
+        cell: touched,
+        value: *after.tape.get(touched)?,
+    })
+}
+
 pub fn adapt_all(
     item: &BaseItem,
     t1_probe_count: usize,
@@ -88,15 +113,19 @@ pub fn adapt_all(
         EncodingId::E1,
         EncodingId::E2,
         EncodingId::E3,
-    ] {
+    ]
+    .into_iter()
+    .filter(|encoding| {
+        crate::generator::tier_renders_encoding(item.annotations.program_size_tier, *encoding)
+    }) {
         let explicit_run = matches!(e, EncodingId::E2 | EncodingId::E3).then(|| {
             bytecode
-                .execute_traced(&item.input, 1_000_000, true)
+                .execute_traced(&item.input, PINNED_STEP_CAP, true)
                 .expect("validated backend")
         });
         let trace_len = explicit_run
             .as_ref()
-            .map_or(item.oracles.full_trace.len(), |run| run.trace.len());
+            .map_or(item.annotations.n_steps as usize, |run| run.trace.len());
         let probe_count = t1_probe_count.max(1);
         let mut numerators: Vec<usize> = (1..=probe_count).collect();
         let rotation = (item.seed as usize) % probe_count;
@@ -118,17 +147,13 @@ pub fn adapt_all(
                     ),
                 )
             } else {
-                let p = &item.oracles.full_trace[index];
+                let step = (index + 1) as u64;
+                let answer = implicit_probe_answer(item, step)
+                    .expect("accepted item replays its own implicit trace");
                 (
-                    T1Answer {
-                        step: p.step,
-                        pointer: Some(p.pointer),
-                        cell: p.touched_cell,
-                        value: p.cell_value,
-                    },
+                    answer,
                     format!(
-                        "At completed step {}, report the tape pointer, touched cell index, and that cell's value.",
-                        p.step
+                        "At completed step {step}, report the tape pointer, touched cell index, and that cell's value."
                     ),
                 )
             };
@@ -140,12 +165,16 @@ pub fn adapt_all(
         EncodingId::E1,
         EncodingId::E2,
         EncodingId::E3,
-    ] {
+    ]
+    .into_iter()
+    .filter(|encoding| {
+        crate::generator::tier_renders_encoding(item.annotations.program_size_tier, *encoding)
+    }) {
         let ideal = if matches!(e, EncodingId::E0 | EncodingId::E1) {
             item.annotations.n_steps
         } else {
             bytecode
-                .execute(&item.input, 1_000_000)
+                .execute(&item.input, PINNED_STEP_CAP)
                 .expect("validated backend")
                 .steps
         };
@@ -179,7 +208,11 @@ pub fn adapt_all(
             EncodingId::E1,
             EncodingId::E2,
             EncodingId::E3,
-        ] {
+        ]
+        .into_iter()
+        .filter(|encoding| {
+            crate::generator::tier_renders_encoding(item.annotations.program_size_tier, *encoding)
+        }) {
             let mutation = match e {
                 EncodingId::E0 => format!(
                     "replace instruction {} ({}) with {}",
@@ -212,7 +245,7 @@ pub fn adapt_all(
                 item.annotations.n_steps.max(1)
             } else {
                 bytecode
-                    .execute(&item.input, 1_000_000)
+                    .execute(&item.input, PINNED_STEP_CAP)
                     .expect("validated backend")
                     .steps
                     .max(1)
@@ -277,23 +310,20 @@ pub fn t1_probe_task(item: &BaseItem, e: EncodingId, step: u64) -> Option<TaskRe
         return None;
     }
     let (answer, question, n_ideal) = if matches!(e, EncodingId::E0 | EncodingId::E1) {
-        let p = item.oracles.full_trace.iter().find(|p| p.step == step)?;
+        if step > item.annotations.n_steps {
+            return None;
+        }
         (
-            T1Answer {
-                step,
-                pointer: Some(p.pointer),
-                cell: p.touched_cell,
-                value: p.cell_value,
-            },
+            implicit_probe_answer(item, step)?,
             format!(
                 "At completed step {step}, report the tape pointer, touched cell index, and that cell's value."
             ),
-            item.oracles.full_trace.len(),
+            item.annotations.n_steps as usize,
         )
     } else {
         let run = Bytecode::from_e0(&item.encodings.e0)
             .ok()?
-            .execute_traced(&item.input, 1_000_000, true)
+            .execute_traced(&item.input, PINNED_STEP_CAP, true)
             .ok()?;
         let p = run.trace.iter().find(|p| p.step == step)?;
         (
@@ -466,8 +496,12 @@ pub fn expression_grammar_token_count(source: &str) -> Result<u32, String> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BpePromptRatios {
-    pub e2_prompt_over_e0_prompt: f64,
-    pub e3_prompt_over_e0_prompt: f64,
+    /// D36: `None` means the tier does not render that encoding at all, which
+    /// is different from "rendered and measured as zero". Recording 0.0 for an
+    /// absent rendering would put a number in the annotations that never
+    /// happened.
+    pub e2_prompt_over_e0_prompt: Option<f64>,
+    pub e3_prompt_over_e0_prompt: Option<f64>,
 }
 
 /// Measures the complete model-facing prompt, pairing each explicit task with
@@ -504,7 +538,9 @@ pub fn ladder_prompt_bpe_ratios(
                 e0.get(&e0_id)
                     .map(|denominator| tokenizer.count(&task.prompt) as f64 / *denominator as f64)
             })
-            .fold(0.0f64, f64::max)
+            .fold(None::<f64>, |best, ratio| {
+                Some(best.map_or(ratio, |value: f64| value.max(ratio)))
+            })
     };
     Ok(BpePromptRatios {
         e2_prompt_over_e0_prompt: max_ratio(EncodingId::E2, "-e2"),
@@ -560,12 +596,27 @@ pub fn matched_t2_prompt_pairs(
                 .map(|task| tokenizer.count(&task.prompt) as u64)
                 .ok_or_else(|| format!("missing T2/{encoding:?} task for {}", item.item_id))
         };
-        lengths.push((item, t2(EncodingId::E0)?, t2(encoded_as)?));
+        // D36: every item supplies the E0 side, but only tiers that actually
+        // render `encoded_as` can supply the encoded side. Treating a missing
+        // rendering as an error would abort the whole table; it is simply an
+        // item that is ineligible for that half of the pair.
+        let encoded = if crate::generator::tier_renders_encoding(
+            item.annotations.program_size_tier,
+            encoded_as,
+        ) {
+            Some(t2(encoded_as)?)
+        } else {
+            None
+        };
+        lengths.push((item, t2(EncodingId::E0)?, encoded));
     }
 
     let mut candidates = Vec::new();
     for (e0_index, (e0_item, e0_tokens, _)) in lengths.iter().enumerate() {
         for (encoded_index, (encoded_item, _, encoded_tokens)) in lengths.iter().enumerate() {
+            let Some(encoded_tokens) = encoded_tokens else {
+                continue;
+            };
             if e0_item.annotations.program_size_tier <= encoded_item.annotations.program_size_tier {
                 continue;
             }
@@ -588,10 +639,17 @@ pub fn matched_t2_prompt_pairs(
         if used.contains(&e0_index) || used.contains(&encoded_index) {
             continue;
         }
-        used.insert(e0_index);
-        used.insert(encoded_index);
         let (e0_item, e0_tokens, _) = lengths[e0_index];
         let (encoded_item, _, encoded_tokens) = lengths[encoded_index];
+        // Only indices whose encoded rendering exists reach `candidates`, so
+        // this is total by construction; skipping rather than unwrapping keeps
+        // it that way if the candidate filter is ever changed. The check comes
+        // before the `used` inserts so a skipped index is not consumed.
+        let Some(encoded_tokens) = encoded_tokens else {
+            continue;
+        };
+        used.insert(e0_index);
+        used.insert(encoded_index);
         pairs.push(MatchedPromptPair {
             e0_item_id: e0_item.item_id.clone(),
             encoded_item_id: encoded_item.item_id.clone(),
@@ -621,23 +679,71 @@ pub fn task_budgets_are_encoding_invariant(
     t3_token_cap: u32,
 ) -> bool {
     let records = adapt_all(item, t1_probe_count, t2_token_cap, t3_token_cap);
-    let t2 = records
-        .iter()
-        .filter(|task| task.family == Family::T2)
-        .filter_map(|task| task.hard_token_cap)
-        .collect::<Vec<_>>();
-    let t3 = records
-        .iter()
-        .filter(|task| task.family == Family::T3)
-        .filter_map(|task| task.hard_token_cap)
-        .collect::<Vec<_>>();
-    t2.len() == 4
-        && t2.windows(2).all(|pair| pair[0] == pair[1])
-        && t2[0] >= item.oracles.t2_reference_solution_tokens_upper_bound
-        && t2[0] <= t2_token_cap.max(item.oracles.t2_reference_solution_tokens_upper_bound)
-        && t3.len() == 4
-        && t3.windows(2).all(|pair| pair[0] == pair[1])
-        && t3[0] <= t3_token_cap
+    task_records_have_encoding_invariant_budgets(
+        item.annotations.program_size_tier,
+        item.oracles.t2_reference_solution_tokens_upper_bound,
+        &records,
+        t2_token_cap,
+        t3_token_cap,
+    )
+}
+
+/// D11 + D36: response budgets remain representation-independent, but the
+/// comparison domain is the set of encodings actually rendered at this tier.
+/// A missing rendering is not a budget value. Every expected rendering must
+/// still occur exactly once, and every rendered value must agree.
+fn task_records_have_encoding_invariant_budgets(
+    program_size_tier: u8,
+    t2_reference_solution_tokens_upper_bound: u32,
+    records: &[TaskRecord],
+    t2_token_cap: u32,
+    t3_token_cap: u32,
+) -> bool {
+    let rendered_encodings = [
+        EncodingId::E0,
+        EncodingId::E1,
+        EncodingId::E2,
+        EncodingId::E3,
+    ]
+    .into_iter()
+    .filter(|encoding| crate::generator::tier_renders_encoding(program_size_tier, *encoding))
+    .collect::<Vec<_>>();
+
+    let family_budget = |family| {
+        let family_records = records
+            .iter()
+            .filter(|task| task.family == family)
+            .collect::<Vec<_>>();
+        if family_records.len() != rendered_encodings.len() {
+            return None;
+        }
+        let mut budgets = Vec::with_capacity(rendered_encodings.len());
+        for encoding in &rendered_encodings {
+            let mut matching = family_records
+                .iter()
+                .filter(|task| task.encoding == *encoding);
+            let budget = matching.next()?.hard_token_cap?;
+            if matching.next().is_some() {
+                return None;
+            }
+            budgets.push(budget);
+        }
+        let first = *budgets.first()?;
+        budgets
+            .iter()
+            .all(|budget| *budget == first)
+            .then_some(first)
+    };
+
+    let Some(t2) = family_budget(Family::T2) else {
+        return false;
+    };
+    let Some(t3) = family_budget(Family::T3) else {
+        return false;
+    };
+    t2 >= t2_reference_solution_tokens_upper_bound
+        && t2 <= t2_token_cap.max(t2_reference_solution_tokens_upper_bound)
+        && t3 <= t3_token_cap
 }
 
 pub fn batch_budgets_are_diverse(items: &[BaseItem], t2_token_cap: u32, t3_token_cap: u32) -> bool {
@@ -2409,7 +2515,7 @@ pub fn verify_t2_expression(task: &TaskRecord, item: &BaseItem, response: &str) 
             };
         };
         let truth = bf
-            .execute(&input, 1_000_000, false)
+            .execute(&input, PINNED_STEP_CAP, false)
             .expect("accepted domain")
             .state
             .output;
@@ -2839,6 +2945,57 @@ mod tests {
         let table = format!("TABLE=[{}]", "[0],".repeat(256));
         assert!(lexical_token_count(&table) > 192);
         assert!(parse_solution(&table).is_err());
+    }
+
+    #[test]
+    fn tier_without_e3_checks_only_rendered_budgets_and_still_rejects_a_difference() {
+        let tier = crate::generator::HIGHEST_TIER_RENDERED_AS_E3 + 1;
+        assert!(crate::generator::tier_renders_encoding(
+            tier,
+            EncodingId::E2
+        ));
+        assert!(!crate::generator::tier_renders_encoding(
+            tier,
+            EncodingId::E3
+        ));
+
+        let rendered = [
+            EncodingId::E0,
+            EncodingId::E1,
+            EncodingId::E2,
+            EncodingId::E3,
+        ]
+        .into_iter()
+        .filter(|encoding| crate::generator::tier_renders_encoding(tier, *encoding));
+        let mut records = Vec::new();
+        for encoding in rendered {
+            for (family, cap) in [(Family::T2, 40), (Family::T3, 50)] {
+                records.push(TaskRecord {
+                    schema_version: "test".into(),
+                    task_id: format!("{family:?}-{encoding:?}"),
+                    program_id: "program".into(),
+                    item_id: "tier-4-item".into(),
+                    family,
+                    encoding,
+                    prompt: String::new(),
+                    hard_token_cap: Some(cap),
+                    payload: serde_json::Value::Null,
+                });
+            }
+        }
+
+        assert!(task_records_have_encoding_invariant_budgets(
+            tier, 30, &records, 384, 96
+        ));
+
+        records
+            .iter_mut()
+            .find(|task| task.family == Family::T2 && task.encoding == EncodingId::E2)
+            .unwrap()
+            .hard_token_cap = Some(41);
+        assert!(!task_records_have_encoding_invariant_budgets(
+            tier, 30, &records, 384, 96
+        ));
     }
 
     #[test]
