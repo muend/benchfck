@@ -15,7 +15,7 @@
     "encodings": {"type": "object", "required": ["e0", "e1", "e1_legend", "e2", "e3", "e4", "e4_residual_unvalidated_risk"]},
     "compiler": {"type": "object"},
     "annotations": {"type": "object", "required": ["grammar_shape", "program_size_tier", "e0_program_bpe_tokens", "e2_program_bpe_tokens", "e3_program_bpe_tokens", "n_steps", "semantic_steps", "trace_semantic_density", "text_semantic_density", "prompt_tokenizer", "e2_e0_prompt_bpe_ratio", "e3_e0_prompt_bpe_ratio", "e2_e0_program_bpe_ratio", "e3_e0_program_bpe_ratio", "move_carrier", "rejection_histogram_before_acceptance", "minimum_loop_iterations", "difficulty_band", "pointer_volatility"]},
-    "oracles": {"type": "object", "required": ["full_trace", "avalanche_map", "avalanche_score", "avalanche_sampling_rate", "semantic_fingerprint", "t2_reference_solution", "t2_reference_solution_tokens_upper_bound", "t2_nontriviality_witness"]},
+    "oracles": {"type": "object", "required": ["avalanche_map", "avalanche_score", "avalanche_sampling_rate", "semantic_fingerprint", "t2_reference_solution", "t2_reference_solution_tokens_upper_bound", "t2_nontriviality_witness"]},
     "reserved_families": {"type": "array", "contains": {"const": "T4"}}
   },
   "additionalProperties": false

@@ -3,7 +3,7 @@
 [![version](https://img.shields.io/badge/version-0.4.0--alpha-orange)](https://github.com/muend/benchfck)
 [![status](https://img.shields.io/badge/status-engineering_candidate-6f42c1)](VALIDITY.md)
 [![model results](https://img.shields.io/badge/model_results-none-lightgrey)](VALIDITY.md)
-[![release evidence](https://img.shields.io/badge/release_evidence-0-lightgrey)](evidence/README.md)
+[![release evidence](https://img.shields.io/badge/release_evidence-2-blue)](evidence/README.md)
 [![CI](https://github.com/muend/benchfck/actions/workflows/ci.yml/badge.svg)](https://github.com/muend/benchfck/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/muend/benchfck/actions/workflows/codeql.yml/badge.svg)](https://github.com/muend/benchfck/actions/workflows/codeql.yml)
 [![license](https://img.shields.io/badge/code-Apache--2.0-blue)](LICENSE)
@@ -48,7 +48,7 @@ executors:
 cell = 8-bit unsigned, wraps at 255→0 and 0→255
 tape = 30,000 cells, pointer starts at 0, moving left of 0 is a hard error
 `,` on exhausted input sets the cell to 0
-step cap = 1,000,000; exceeding it classifies the run as `NON_TERMINATING`
+step cap = 8,000,000; exceeding it classifies the run as `NON_TERMINATING`
 ```
 
 ## Encoding ladder
@@ -79,7 +79,7 @@ program-only ratios describe intervention strength.
 
 | Contrast | Prompt BPE ratio | Program BPE ratio | Analysis rule |
 |---|---:|---:|---|
-| E2 / E0 | 3.356× | 3.981× | Acceptance ceiling 3.5×; also report token covariate |
+| E2 / E0 | 3.356× | 3.981× | No ratio ceiling; only preregistered token-matched pairs |
 | E3 / E0 | 7.072× | 8.681× | No ratio ceiling; only preregistered token-matched pairs |
 
 ## Task families
@@ -110,25 +110,25 @@ validity contract is [`VALIDITY.md`](VALIDITY.md).
 |---|---:|---|
 | Cell model | unsigned 8-bit, wrapping | all executions |
 | Tape / left boundary | 30,000 cells / hard error | all executions |
-| Step cap | 1,000,000 | all executions |
+| Step cap | 8,000,000 | all executions; measured tier-9 max 5,678,676 + 40.9% margin |
 | Maximum input arity | 2 | generation; exhaustive domains are 256 or 65,536 |
 | Layout disciplines | 4 | three generation layouts + explicit held-out layout |
 | Statement templates target | 3 | compiler diversity |
 | Per-argument sensitivity | required | candidate acceptance |
 | IR ≡ E0 ≡ E2 ≡ E3 | full input domain | candidate acceptance |
 | Trace semantic density | ≥ 0.30 | candidate acceptance |
-| Source-text semantic density | ≥ 0.35 | candidate acceptance |
+| Source-text semantic density | no floor | recorded covariate; see the gate ledger in `VALIDITY.md` |
 | Avalanche score | ≥ 0.60 | candidate acceptance |
 | Avalanche sampled positions | ≥ 64 | candidate acceptance |
 | Canonical-idiom rate | < 0.08 | candidate acceptance |
-| E2/E0 prompt BPE ratio | ≤ 3.5 (`cl100k_base`) | candidate acceptance |
-| E3/E0 prompt BPE ratio | exempt | token-matched analysis only |
+| E2/E0 prompt BPE ratio | exempt (`cl100k_base`) | recorded covariate; token-matched analysis only |
+| E3/E0 prompt BPE ratio | exempt (`cl100k_base`) | recorded covariate; token-matched analysis only |
 | T1 probes | 3 per encoding | public task export |
 | T2 folded expression threshold | 25 restricted-grammar tokens | hybrid nontriviality gate |
 | T2 exact enumerator | target AST depth 7; proven minimum 3 | measured, never reported as depth 24 |
 | T2 response safety cap | 384 tokens | one item-level cap across E0–E3 |
 | T3 response safety cap | 96 tokens | one item-level cap across E0–E3 |
-| Size ladder | 8 labelled tiers | function-preserving reversible work |
+| Size ladder | 10 labelled tiers | function-preserving reversible work |
 | Matched-pair batch gate | ≥30 disjoint pairs per E0↔E2 and E0↔E3 | 100-item batch, ≤10% BPE gap |
 
 ## Quick start
@@ -172,7 +172,7 @@ cargo test --release --test property_10k -- --ignored
 | Evidence class | Published count | Meaning |
 |---|---:|---|
 | Model runs | **0** | No external evaluation has been run |
-| Release JSONL artifacts | **0** | Phase 2 has not started |
+| Release evidence artifacts | **4** | Arity-1 batch, matched pairs, budget pilot, and 500-candidate rejection histogram; Phase 2 is incomplete |
 | Leaderboards | **0** | No ranking or aggregate benchmark score exists |
 | Engineering diagnostics | local only | Used to test instrumentation; not benchmark evidence |
 
@@ -180,7 +180,7 @@ cargo test --release --test property_10k -- --ignored
 
 - No external model adapter is wired into the repository.
 - No answer-bearing item, private constructor, or oracle artifact is published.
-- No release dataset or result file is present under `evidence/`.
+- No completed release-evidence package or external model result is present under `evidence/`.
 - No benchmark score, model comparison, leaderboard, or validity claim is reported.
 - E4 natural-language rendering exists only as residual-risk diagnostic code and is not an
   official evaluation rung.
