@@ -1,3 +1,5 @@
+![benchfck — exact machine-state benchmark harness](docs/assets/social-preview.png)
+
 # benchfck
 
 [![version](https://img.shields.io/badge/version-0.4.0--alpha-orange)](https://github.com/muend/benchfck)
@@ -21,6 +23,28 @@ deterministic; no learned judge is used.
 > **v0.4.0-alpha engineering candidate. No model results have been produced. No
 > leaderboard exists. The official v0.4 evidence scope is arity 1; release gates in
 > [`VALIDITY.md`](VALIDITY.md) beyond the completed Phase 2 population package remain unmet.**
+
+## Project progress
+
+```mermaid
+flowchart LR
+    P0["Phase 0<br/>repository + evidence infrastructure<br/>complete"] --> P1["Phase 1<br/>measurement instruments<br/>complete"]
+    P1 --> P2["Phase 2<br/>arity-1 release evidence<br/>complete"]
+    P2 --> P3["Phase 3<br/>preregistration + model pilot<br/>next"]
+    P3 --> P4["Phase 4<br/>statistical analysis"]
+    P4 --> P5["Phase 5<br/>release + independent reproduction"]
+    classDef complete fill:#173a32,stroke:#55d6a0,color:#f4f1ea;
+    classDef next fill:#3d274f,stroke:#c084fc,color:#f4f1ea;
+    classDef pending fill:#172033,stroke:#64748b,color:#cbd5e1;
+    class P0,P1,P2 complete;
+    class P3 next;
+    class P4,P5 pending;
+```
+
+The deterministic arity-1 population package is complete and manifested. The next
+binding deliverable is a hashed preregistration; no model API call is admissible before
+it freezes the hypotheses, decoding settings, repeat count, stopping rule, and analysis
+plan.
 
 ```mermaid
 flowchart LR
@@ -204,15 +228,14 @@ cargo test --release --test property_10k -- --ignored
    semantic functions in 51 coarse profile buckets, correcting a 108-record overcount
    caused by adjacent-only deduplication.
    The largest bucket contains 250 functions, so profile count is not a count of independent
-   semantic classes. Eight public constructors were promoted
-   across four structural families and pass full-domain, hybrid-gate, reference, and
-   Brainfuck step-cap regressions. This closes constructor selection, not accepted-batch
-   production or external validity: a pre-optimization 8-item easy diagnostic exhausted
-   512 attempts, while the first post-short-circuit single-item diagnostic accepted one
-   item after 19 rejections in 78.6 seconds. The 8- and 100-item throughput gates remain
-   open. Four families also remain a narrow public subset.
-5. **Unmet release work.** The 100-item batch, 10k release property run, external runs, and
-   independent clean-room reproduction are outstanding.
+   semantic classes. Eight public constructors across four structural families pass the
+   full-domain, hybrid-gate, reference, step-cap, accepted-population, and duplicate-audit
+   checks. Four families remain a narrow public development subset and do not substitute
+   for an unpublished official-scoring constructor population.
+5. **Unmet release work.** Preregistration, private constructor population, external model
+   runs, human review, statistical analysis, and independent clean-room reproduction are
+   outstanding. The completed 100-item batch and 10k property run are engineering evidence,
+   not model-validity claims.
 
 ## Citation and license
 
