@@ -41,6 +41,13 @@ impl Defaults {
             )
             .into());
         }
+        if !(1..=2).contains(&defaults.max_arity) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("max_arity must be 1 or 2, got {}", defaults.max_arity),
+            )
+            .into());
+        }
         Ok(defaults)
     }
 }

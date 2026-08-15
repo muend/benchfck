@@ -73,6 +73,18 @@ fn prompt_header() -> String {
     format!("Pinned execution semantics (apply exactly):\n{PINNED_SEMANTICS}\n\n")
 }
 
+/// Builds the production T2 prompt around an explicitly supplied rendering.
+/// Carrier diagnostics use this entry point so their prompt-length comparison
+/// cannot drift from the task adapter's actual wording or item-level budget.
+pub fn t2_prompt_for_source(item: &BaseItem, rendered_source: &str, t2_token_cap: u32) -> String {
+    let cap = item_t2_token_cap(item, t2_token_cap);
+    format!(
+        "{}Program:\n{}\n\nReturn executable code in the restricted Python expression subset. It must be exactly `def solve(inputs):` followed by `return [EXPR, ...]`. Allowed in expressions: integer literals 0 through 256, inputs[N], + - * // % & | ^, unary minus, and parentheses. Constant-only subexpressions are accepted and folded before the lexical-token budget is measured. Lookup tables, loops, conditionals, imports, calls, and prose are forbidden. Hard folded lexical-token cap: {cap}.",
+        prompt_header(),
+        rendered_source
+    )
+}
+
 /// D33: the implicit-encoding trace is never stored. It is a deterministic
 /// function of `e0` and `input`, and storing it dominated private export size
 /// (~17 MB per item at ~200k steps, and the size ladder pushes step counts far
@@ -178,7 +190,7 @@ pub fn adapt_all(
                 .expect("validated backend")
                 .steps
         };
-        out.push(TaskRecord{schema_version:"benchfck.task.v3".into(),task_id:task_id(item,Family::T2,e),program_id:item.program_id.clone(),item_id:item.item_id.clone(),family:Family::T2,encoding:e,prompt:format!("{}Program:\n{}\n\nReturn executable code in the restricted Python expression subset. It must be exactly `def solve(inputs):` followed by `return [EXPR, ...]`. Allowed in expressions: integer literals 0 through 256, inputs[N], + - * // % & | ^, unary minus, and parentheses. Constant-only subexpressions are accepted and folded before the lexical-token budget is measured. Lookup tables, loops, conditionals, imports, calls, and prose are forbidden. Hard folded lexical-token cap: {t2_item_cap}.",prompt_header(),source(item,e)),hard_token_cap:Some(t2_item_cap),payload:json!({"arity":item.ir.arity,"oracle_fingerprint":item.oracles.semantic_fingerprint,"n_ideal":ideal,"reference_solution":item.oracles.t2_reference_solution})});
+        out.push(TaskRecord{schema_version:"benchfck.task.v3".into(),task_id:task_id(item,Family::T2,e),program_id:item.program_id.clone(),item_id:item.item_id.clone(),family:Family::T2,encoding:e,prompt:t2_prompt_for_source(item,&source(item,e),t2_token_cap),hard_token_cap:Some(t2_item_cap),payload:json!({"arity":item.ir.arity,"oracle_fingerprint":item.oracles.semantic_fingerprint,"n_ideal":ideal,"reference_solution":item.oracles.t2_reference_solution})});
     }
     let eligible_mutations = item
         .oracles
@@ -1069,6 +1081,44 @@ fn render_solution(expressions: &[Expr]) -> String {
         .collect::<Vec<_>>()
         .join(",");
     format!("def solve(inputs):\n    return [{body}]")
+}
+
+/// Parse, constant-fold, and render a T2 solution in the same canonical form
+/// used by grading and reference search.
+pub fn canonical_solution(source: &str) -> Result<String, String> {
+    parse_solution(source).map(|expressions| render_solution(&expressions))
+}
+
+/// Evaluate a canonical T2 solution over the complete declared byte domain.
+/// Reference expressions are already full-domain witnesses; exposing the table
+/// lets the duplicate audit compute Hamming distance without rerunning the much
+/// more expensive Brainfuck program.
+pub fn solution_domain_outputs(source: &str, arity: u8) -> Result<Vec<Vec<u8>>, String> {
+    if !(1..=2).contains(&arity) {
+        return Err("arity must be 1 or 2".into());
+    }
+    let expressions = parse_solution(source)?;
+    let required = 256usize.pow(arity as u32);
+    (0..required)
+        .map(|n| {
+            let input = if arity == 1 {
+                vec![n as u8]
+            } else {
+                vec![(n >> 8) as u8, n as u8]
+            };
+            evaluate_expressions(&expressions, &input)
+                .ok_or_else(|| format!("expression evaluation failed at domain index {n}"))
+        })
+        .collect()
+}
+
+/// Complete-domain digest under the benchmark's length-delimited fingerprint
+/// format. The duplicate audit uses this to fail closed if a private reference
+/// expression no longer matches its stored semantic oracle.
+pub fn solution_semantic_digest(source: &str, arity: u8) -> Result<String, String> {
+    let expressions = parse_solution(source)?;
+    expression_digest(&expressions, arity)
+        .ok_or_else(|| "expression failed on the declared byte domain".into())
 }
 
 pub fn folded_solution_token_count(source: &str) -> Result<u64, String> {

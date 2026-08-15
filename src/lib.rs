@@ -6,12 +6,16 @@ use std::fmt::Write;
 
 pub mod backend;
 pub mod bf;
+pub mod carrier_pilot;
 pub mod compiler;
 pub mod config;
 pub mod generator;
 pub mod ir;
+pub mod leak_scan;
 pub mod metrics;
+pub mod near_duplicate;
 pub mod oracle;
+pub mod property;
 pub mod schema;
 pub mod tasks;
 

@@ -1,8 +1,8 @@
 use benchfck::{
-    PINNED_STEP_CAP,
+    PINNED_STEP_CAP, carrier_pilot,
     config::Defaults,
     generator::{self, BuildSpec},
-    metrics,
+    leak_scan, metrics, near_duplicate, property,
     schema::{BaseItem, DifficultyBand, EncodingId, Family, JsonlRecord, TaskRecord},
     tasks::{
         self, DriftAfterKMock, IgnoreWrapMock, ModelAdapter, OffByOnePointerMock, PerfectMock,
@@ -17,6 +17,7 @@ use std::{
     fs::{self, File},
     io::{BufRead, BufReader, BufWriter, Write},
     path::{Component, Path, PathBuf},
+    process::{Command as ProcessCommand, Stdio},
 };
 
 #[derive(Parser)]
@@ -129,6 +130,58 @@ enum Command {
         config: PathBuf,
         #[arg(long)]
         max_per_cell: Option<usize>,
+        #[arg(long, value_enum, default_value = "diagnostic")]
+        artifact_class: ArtifactClass,
+    },
+    /// Write and manifest the fixed near-duplicate metric, thresholds, linkage,
+    /// and release rule. Must run before DuplicateAudit reads a private batch.
+    NearDuplicateProtocol {
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, value_enum, default_value = "diagnostic")]
+        artifact_class: ArtifactClass,
+    },
+    /// Audit every unordered pair in a private arity-1 item export against the
+    /// already-manifested near-duplicate protocol.
+    DuplicateAudit {
+        #[arg(long)]
+        private: PathBuf,
+        #[arg(long)]
+        protocol: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, value_enum, default_value = "diagnostic")]
+        artifact_class: ArtifactClass,
+    },
+    /// Run the deterministic 10,000-program complete-domain cross-backend
+    /// property population. Release evidence is accepted only from --release.
+    Property10k {
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, value_enum, default_value = "diagnostic")]
+        artifact_class: ArtifactClass,
+    },
+    /// Compare RLE, expanded, and omitted movement carriers on the same
+    /// deterministic item from every size tier using production T2 prompts.
+    CarrierPilot {
+        #[arg(long)]
+        private: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, default_value = "config/defaults.toml")]
+        config: PathBuf,
+        #[arg(long, value_enum, default_value = "diagnostic")]
+        artifact_class: ArtifactClass,
+    },
+    /// Verify that a generated public batch contains no private records or
+    /// answer/oracle keys and that its paired private export is ignored.
+    LeakScan {
+        #[arg(long)]
+        public: PathBuf,
+        #[arg(long)]
+        private: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
         #[arg(long, value_enum, default_value = "diagnostic")]
         artifact_class: ArtifactClass,
     },
@@ -251,6 +304,171 @@ fn update_evidence_manifest(path: &Path) -> Result<(), Box<dyn std::error::Error
     }
     fs::write(manifest_path, next)?;
     Ok(())
+}
+
+fn git_path_predicate(args: &[&str], path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
+    let status = ProcessCommand::new("git")
+        .args(args)
+        .arg("--")
+        .arg(path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()?;
+    match status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        code => Err(format!("git {} failed with status {code:?}", args.join(" ")).into()),
+    }
+}
+
+fn evidence_manifest_has(path: &Path, expected_hash: &str) -> Result<bool, String> {
+    let relative = path.to_string_lossy().replace('\\', "/");
+    let manifest = fs::read_to_string("evidence/MANIFEST.txt")
+        .map_err(|error| format!("cannot read evidence manifest: {error}"))?;
+    Ok(manifest.lines().any(|line| {
+        line.split_once("  ")
+            .is_some_and(|(hash, entry)| hash == expected_hash && entry == relative)
+    }))
+}
+
+fn render_duplicate_audit(audit: &near_duplicate::DuplicateAudit, source_sha256: &str) -> String {
+    use std::fmt::Write as _;
+
+    let mut report = String::new();
+    writeln!(report, "# Duplicate and near-duplicate audit").unwrap();
+    writeln!(report).unwrap();
+    writeln!(report, "- Schema: `benchfck.duplicate-audit.v1`").unwrap();
+    writeln!(
+        report,
+        "- Protocol: `{}` (`sha256:{}`)",
+        near_duplicate::PROTOCOL_VERSION,
+        audit.protocol_sha256
+    )
+    .unwrap();
+    writeln!(
+        report,
+        "- Private source SHA-256: `{source_sha256}` (path and contents are intentionally unpublished)"
+    )
+    .unwrap();
+    writeln!(report, "- Arity: `{}`", audit.arity).unwrap();
+    writeln!(report, "- Items: `{}`", audit.item_count).unwrap();
+    writeln!(report, "- Unordered pairs: `{}`", audit.pair_count).unwrap();
+    writeln!(
+        report,
+        "- Release result: **{}**",
+        if audit.release_passed() {
+            "PASS"
+        } else {
+            "FAIL"
+        }
+    )
+    .unwrap();
+    writeln!(report).unwrap();
+    writeln!(report, "## Exact duplicate checks").unwrap();
+    writeln!(report).unwrap();
+    writeln!(report, "| Axis | Exact-equal pairs |").unwrap();
+    writeln!(report, "|---|---:|").unwrap();
+    writeln!(
+        report,
+        "| Complete-domain semantic fingerprint | {} |",
+        audit.exact_semantic_pairs
+    )
+    .unwrap();
+    writeln!(
+        report,
+        "| Ladder-normalized IR feature multiset | {} |",
+        audit.exact_ir_pairs
+    )
+    .unwrap();
+    writeln!(
+        report,
+        "| Canonical reference expression | {} |",
+        audit.exact_reference_pairs
+    )
+    .unwrap();
+    writeln!(report).unwrap();
+    writeln!(report, "## Fixed-threshold checks").unwrap();
+    writeln!(report).unwrap();
+    writeln!(report, "| Check | Pairs |").unwrap();
+    writeln!(report, "|---|---:|").unwrap();
+    writeln!(
+        report,
+        "| Semantic distance ≤1/64 | {} |",
+        audit.semantic_near_pairs
+    )
+    .unwrap();
+    writeln!(
+        report,
+        "| Normalized IR distance ≤0.10 | {} |",
+        audit.ir_near_pairs
+    )
+    .unwrap();
+    writeln!(
+        report,
+        "| Canonical reference distance ≤0.10 | {} |",
+        audit.reference_near_pairs
+    )
+    .unwrap();
+    writeln!(
+        report,
+        "| Flagged by semantic AND (IR OR reference) | {} ({:.4}%) |",
+        audit.flagged_pairs.len(),
+        audit.flagged_pairs.len() as f64 * 100.0 / audit.pair_count.max(1) as f64
+    )
+    .unwrap();
+    if let Some(pair) = &audit.closest_pair {
+        writeln!(report).unwrap();
+        writeln!(report, "## Closest pair under the frozen ordering").unwrap();
+        writeln!(report).unwrap();
+        writeln!(
+            report,
+            "`{}` ({}) ↔ `{}` ({}): semantic `{}/{}` ({:.4}%), IR `{:.4}`, reference `{:.4}`, flagged `{}`.",
+            pair.left_item_id,
+            pair.left_semantic_class,
+            pair.right_item_id,
+            pair.right_semantic_class,
+            pair.semantic_disagreements,
+            pair.domain_size,
+            pair.semantic_distance() * 100.0,
+            pair.ir_distance(),
+            pair.reference_distance(),
+            pair.flagged
+        )
+        .unwrap();
+    }
+    writeln!(report).unwrap();
+    writeln!(report, "## Flagged pairs").unwrap();
+    writeln!(report).unwrap();
+    if audit.flagged_pairs.is_empty() {
+        writeln!(report, "None.").unwrap();
+    } else {
+        writeln!(
+            report,
+            "| Left | Right | Semantic disagreements | IR distance | Reference distance |"
+        )
+        .unwrap();
+        writeln!(report, "|---|---|---:|---:|---:|").unwrap();
+        for pair in &audit.flagged_pairs {
+            writeln!(
+                report,
+                "| `{}` | `{}` | {}/{} | {:.4} | {:.4} |",
+                pair.left_item_id,
+                pair.right_item_id,
+                pair.semantic_disagreements,
+                pair.domain_size,
+                pair.ir_distance(),
+                pair.reference_distance()
+            )
+            .unwrap();
+        }
+    }
+    writeln!(report).unwrap();
+    writeln!(
+        report,
+        "Canonical references were re-parsed, constant-folded, evaluated over the complete domain, and required to reproduce each stored semantic fingerprint before pairwise distances were computed."
+    )
+    .unwrap();
+    report
 }
 
 #[derive(Deserialize)]
@@ -867,6 +1085,250 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if artifact_class == ArtifactClass::Evidence {
                 update_evidence_manifest(&output)?;
             }
+        }
+        Command::NearDuplicateProtocol {
+            output,
+            artifact_class,
+        } => {
+            validate_generate_output(&output, artifact_class)?;
+            fs::write(&output, near_duplicate::PROTOCOL_MARKDOWN)?;
+            if artifact_class == ArtifactClass::Evidence {
+                update_evidence_manifest(&output)?;
+            }
+            eprintln!(
+                "wrote {} protocol sha256:{}",
+                near_duplicate::PROTOCOL_VERSION,
+                near_duplicate::protocol_sha256()
+            );
+        }
+        Command::DuplicateAudit {
+            private,
+            protocol,
+            output,
+            artifact_class,
+        } => {
+            validate_generate_output(&output, artifact_class)?;
+            if private == output || protocol == output {
+                return Err("duplicate-audit output must differ from its inputs".into());
+            }
+            let protocol_bytes = fs::read(&protocol)?;
+            if protocol_bytes != near_duplicate::PROTOCOL_MARKDOWN.as_bytes() {
+                return Err(format!(
+                    "protocol does not exactly match compiled {} (expected sha256:{})",
+                    near_duplicate::PROTOCOL_VERSION,
+                    near_duplicate::protocol_sha256()
+                )
+                .into());
+            }
+            if artifact_class == ArtifactClass::Evidence
+                && (!path_starts_with_evidence(&protocol)
+                    || !evidence_manifest_has(&protocol, &near_duplicate::protocol_sha256())?)
+            {
+                return Err(
+                    "evidence audit requires the exact protocol below evidence/ and already recorded in evidence/MANIFEST.txt"
+                        .into(),
+                );
+            }
+            let source_bytes = fs::read(&private)?;
+            let source_sha256 = benchfck::lower_hex(&Sha256::digest(&source_bytes));
+            let records = BufReader::new(source_bytes.as_slice())
+                .lines()
+                .map(|line| Ok(serde_json::from_str::<JsonlRecord>(&line?)?))
+                .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
+            let items = records
+                .into_iter()
+                .filter_map(|record| match record {
+                    JsonlRecord::Item(item) => Some(*item),
+                    JsonlRecord::PublicItemMetadata(_) | JsonlRecord::Task(_) => None,
+                })
+                .collect::<Vec<_>>();
+            if artifact_class == ArtifactClass::Evidence && items.len() < 100 {
+                return Err(format!(
+                    "release duplicate audit requires at least 100 private items, found {}",
+                    items.len()
+                )
+                .into());
+            }
+            let audit = near_duplicate::audit(&items)?;
+            let report = render_duplicate_audit(&audit, &source_sha256);
+            fs::write(&output, report)?;
+            if artifact_class == ArtifactClass::Evidence {
+                update_evidence_manifest(&output)?;
+            }
+            if !audit.release_passed() {
+                return Err(format!(
+                    "duplicate audit failed: exact semantic pairs={}, flagged near pairs={}; report was written",
+                    audit.exact_semantic_pairs,
+                    audit.flagged_pairs.len()
+                )
+                .into());
+            }
+        }
+        Command::Property10k {
+            output,
+            artifact_class,
+        } => {
+            validate_generate_output(&output, artifact_class)?;
+            if artifact_class == ArtifactClass::Evidence && cfg!(debug_assertions) {
+                return Err(
+                    "property-10k evidence must be produced by a release build; rerun cargo run --release"
+                        .into(),
+                );
+            }
+            let started = std::time::Instant::now();
+            property::validate_range(property::RELEASE_PROGRAMS)?;
+            let elapsed_seconds = started.elapsed().as_secs_f64();
+            let protocol_sha256 =
+                benchfck::lower_hex(&Sha256::digest(property::PROTOCOL.as_bytes()));
+            let report = format!(
+                "schema=benchfck.property-10k.v1\n\
+status=PASS\n\
+build_profile={}\n\
+protocol={}\n\
+protocol_sha256={}\n\
+programs={}\n\
+inputs_per_program={}\n\
+input_bindings={}\n\
+layouts=contiguous:3334,interleaved:3333,strided:3333\n\
+backends=typed_ir,e0_brainfuck,e2_compact_explicit,e3_verbose_explicit\n\
+step_cap={}\n\
+elapsed_seconds={elapsed_seconds:.3}\n",
+                if cfg!(debug_assertions) {
+                    "debug"
+                } else {
+                    "release"
+                },
+                property::PROTOCOL_VERSION,
+                protocol_sha256,
+                property::RELEASE_PROGRAMS,
+                property::INPUTS_PER_PROGRAM,
+                property::RELEASE_PROGRAMS * property::INPUTS_PER_PROGRAM,
+                property::PROPERTY_STEP_CAP,
+            );
+            fs::write(&output, report)?;
+            if artifact_class == ArtifactClass::Evidence {
+                update_evidence_manifest(&output)?;
+            }
+            eprintln!(
+                "validated {} programs over {} bindings in {elapsed_seconds:.3}s",
+                property::RELEASE_PROGRAMS,
+                property::RELEASE_PROGRAMS * property::INPUTS_PER_PROGRAM,
+            );
+        }
+        Command::CarrierPilot {
+            private,
+            output,
+            config,
+            artifact_class,
+        } => {
+            validate_generate_output(&output, artifact_class)?;
+            if private == output || config == output {
+                return Err("carrier-pilot output must differ from its inputs".into());
+            }
+            let source_bytes = fs::read(&private)?;
+            let source_sha256 = benchfck::lower_hex(&Sha256::digest(&source_bytes));
+            let records = BufReader::new(source_bytes.as_slice())
+                .lines()
+                .map(|line| Ok(serde_json::from_str::<JsonlRecord>(&line?)?))
+                .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
+            let items = records
+                .into_iter()
+                .filter_map(|record| match record {
+                    JsonlRecord::Item(item) => Some(*item),
+                    JsonlRecord::PublicItemMetadata(_) | JsonlRecord::Task(_) => None,
+                })
+                .collect::<Vec<_>>();
+            if artifact_class == ArtifactClass::Evidence && items.len() < 100 {
+                return Err(format!(
+                    "release carrier pilot requires at least 100 private items, found {}",
+                    items.len()
+                )
+                .into());
+            }
+            let defaults = Defaults::load(&config)?;
+            let report = carrier_pilot::render(
+                &items,
+                &defaults.prompt_tokenizer,
+                defaults.t2_token_cap,
+                &source_sha256,
+            )?;
+            fs::write(&output, report)?;
+            if artifact_class == ArtifactClass::Evidence {
+                update_evidence_manifest(&output)?;
+            }
+            eprintln!(
+                "validated RLE/expanded/omitted carriers across {} size tiers",
+                generator::PROGRAM_SIZE_TIERS
+            );
+        }
+        Command::LeakScan {
+            public,
+            private,
+            output,
+            artifact_class,
+        } => {
+            validate_generate_output(&output, artifact_class)?;
+            if public == private || public == output || private == output {
+                return Err("leak-scan inputs and output must be distinct".into());
+            }
+            let public_bytes = fs::read(&public)?;
+            let public_sha256 = benchfck::lower_hex(&Sha256::digest(&public_bytes));
+            if artifact_class == ArtifactClass::Evidence
+                && (!path_starts_with_evidence(&public)
+                    || !evidence_manifest_has(&public, &public_sha256)?)
+            {
+                return Err(
+                    "evidence leak scan requires an already-manifested public source below evidence/"
+                        .into(),
+                );
+            }
+            let private_bytes = fs::read(&private)?;
+            let private_sha256 = benchfck::lower_hex(&Sha256::digest(&private_bytes));
+            let private_records = BufReader::new(private_bytes.as_slice())
+                .lines()
+                .map(|line| Ok(serde_json::from_str::<JsonlRecord>(&line?)?))
+                .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
+            let private_items = private_records
+                .into_iter()
+                .filter_map(|record| match record {
+                    JsonlRecord::Item(item) => Some(*item),
+                    JsonlRecord::PublicItemMetadata(_) | JsonlRecord::Task(_) => None,
+                })
+                .collect::<Vec<_>>();
+            if artifact_class == ArtifactClass::Evidence && private_items.len() < 100 {
+                return Err(format!(
+                    "release leak scan requires at least 100 private items, found {}",
+                    private_items.len()
+                )
+                .into());
+            }
+            let private_ignored = git_path_predicate(&["check-ignore", "--quiet"], &private)?;
+            let private_tracked = git_path_predicate(&["ls-files", "--error-unmatch"], &private)?;
+            let audit = leak_scan::audit(
+                &public_bytes,
+                &private_items,
+                private_ignored,
+                !private_tracked,
+            )?;
+            fs::write(
+                &output,
+                leak_scan::render(
+                    &audit,
+                    &public.to_string_lossy().replace('\\', "/"),
+                    &public_sha256,
+                    &private_sha256,
+                ),
+            )?;
+            if artifact_class == ArtifactClass::Evidence {
+                update_evidence_manifest(&output)?;
+            }
+            if !audit.release_passed() {
+                return Err("generated-batch leak scan failed; report was written".into());
+            }
+            eprintln!(
+                "leak scan passed for {} public records and {} private items",
+                audit.public_records, audit.private_item_records
+            );
         }
         Command::Probe {
             seed,

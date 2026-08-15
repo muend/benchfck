@@ -1,0 +1,12 @@
+schema=benchfck.property-10k.v1
+status=PASS
+build_profile=release
+protocol=benchfck.property-suite.v1
+protocol_sha256=b9713b1d8f0cbd58bb9c54537adf870682200552545d1455e7f179b97294ca9f
+programs=10000
+inputs_per_program=256
+input_bindings=2560000
+layouts=contiguous:3334,interleaved:3333,strided:3333
+backends=typed_ir,e0_brainfuck,e2_compact_explicit,e3_verbose_explicit
+step_cap=1000000
+elapsed_seconds=250.773

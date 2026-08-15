@@ -76,9 +76,9 @@ impl Bytecode {
     ) -> Result<Self, BackendError> {
         let raw = parse_e0_expanded(source)?;
         let ops = match move_carrier {
-            MoveCarrier::Rle => compress_runs(&raw),
-            MoveCarrier::Expanded => raw,
-            MoveCarrier::Omitted => omit_moves(&raw),
+            MoveCarrier::Rle => compress_runs(&raw, true),
+            MoveCarrier::Expanded => compress_runs(&raw, false),
+            MoveCarrier::Omitted => omit_moves(&compress_runs(&raw, true)),
         };
         Ok(Self { ops, move_carrier })
     }
@@ -294,7 +294,7 @@ fn parse_e0_expanded(source: &str) -> Result<Vec<Op>, BackendError> {
     Ok(ops)
 }
 
-fn compress_runs(raw: &[Op]) -> Vec<Op> {
+fn compress_runs(raw: &[Op], compress_moves: bool) -> Vec<Op> {
     let mut out = Vec::new();
     let mut raw_to_out = vec![0usize; raw.len() + 1];
     let mut i = 0;
@@ -303,7 +303,7 @@ fn compress_runs(raw: &[Op]) -> Vec<Op> {
         raw_to_out[i] = out_index;
         let mut j = i + 1;
         let compressed = match raw[i] {
-            Op::Move(first, 1) => {
+            Op::Move(first, 1) if compress_moves => {
                 let mut final_cell = first;
                 let mut direction = None;
                 while let Some(Op::Move(next, 1)) = raw.get(j) {
@@ -595,5 +595,40 @@ mod tests {
         let expanded = Bytecode::from_e0_with_carrier(source, MoveCarrier::Expanded).unwrap();
         assert!(rle.e2_source().len() * 3 < expanded.e2_source().len());
         assert!(rle.e3_source().len() * 3 < expanded.e3_source().len());
+    }
+
+    #[test]
+    fn diagnostic_carriers_change_only_the_move_channel() {
+        let source = ">>>>>>>>>>>>>>>>++++++++++++++++++++<<<<<<<<<<<<<<<<";
+        let rle = Bytecode::from_e0_with_carrier(source, MoveCarrier::Rle).unwrap();
+        let expanded = Bytecode::from_e0_with_carrier(source, MoveCarrier::Expanded).unwrap();
+        let omitted = Bytecode::from_e0_with_carrier(source, MoveCarrier::Omitted).unwrap();
+
+        let non_moves = |bytecode: &Bytecode| {
+            bytecode
+                .ops
+                .iter()
+                .filter(|op| !matches!(op, Op::Move(_, _)))
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(non_moves(&rle), non_moves(&expanded));
+        assert_eq!(non_moves(&rle), non_moves(&omitted));
+        assert_eq!(
+            expanded
+                .ops
+                .iter()
+                .filter(|op| matches!(op, Op::Move(_, _)))
+                .count(),
+            32
+        );
+        assert_eq!(
+            rle.ops
+                .iter()
+                .filter(|op| matches!(op, Op::Move(_, _)))
+                .count(),
+            2
+        );
+        assert!(omitted.ops.iter().all(|op| !matches!(op, Op::Move(_, _))));
     }
 }

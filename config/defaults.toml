@@ -1,7 +1,9 @@
 # PENDING DECISION: v1 conditionals intentionally have no `else` arm.
 if_without_else = true
-# PENDING DECISION: arity <= 2 keeps equivalence checks exhaustive.
-max_arity = 2
+# D52: v0.4 release evidence is arity-1 only. Arity-2 remains available to
+# diagnostic/library callers that deliberately load a separate max_arity=2
+# configuration, but it is not admissible to the v0.4 evidence path.
+max_arity = 1
 # PENDING DECISION: three generation layouts plus one held-out layout.
 layout_disciplines = 4
 held_out_layout = "held_out"

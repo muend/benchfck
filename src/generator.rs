@@ -177,8 +177,8 @@ pub fn tier_renders_encoding(size_tier: u8, encoding: EncodingId) -> bool {
 
 #[derive(Debug, Error)]
 pub enum GenerateError {
-    #[error("arity must be 1 or 2")]
-    BadArity,
+    #[error("arity {requested} is outside the configured range 1..={maximum}")]
+    BadArity { requested: u8, maximum: u8 },
     #[error("compile failed: {0}")]
     Compile(#[from] crate::compiler::CompileError),
     #[error("explicit backend failed: {0}")]
@@ -606,8 +606,11 @@ fn generate_inner(
     defaults: &Defaults,
     trace: &mut Vec<CandidateOutcome>,
 ) -> Result<Vec<BaseItem>, GenerateError> {
-    if !(1..=2).contains(&spec.arity) {
-        return Err(GenerateError::BadArity);
+    if spec.arity == 0 || spec.arity > defaults.max_arity {
+        return Err(GenerateError::BadArity {
+            requested: spec.arity,
+            maximum: defaults.max_arity,
+        });
     }
     let mut accepted = vec![];
     let mut attempt = 0;
@@ -1245,6 +1248,31 @@ mod tests {
             result.is_err(),
             "a 6-candidate budget cannot complete a 100-item batch"
         );
+    }
+
+    #[test]
+    fn release_defaults_reject_arity_two_before_candidate_work() {
+        let defaults = Defaults::load("config/defaults.toml").expect("defaults load");
+        let (result, trace) = generate_traced(
+            &BuildSpec {
+                seed: 42,
+                count: 1,
+                difficulty: DifficultyBand::Easy,
+                arity: 2,
+                held_out: false,
+                max_attempts: Some(1),
+                max_items_per_cell: None,
+            },
+            &defaults,
+        );
+        assert!(matches!(
+            result,
+            Err(GenerateError::BadArity {
+                requested: 2,
+                maximum: 1
+            })
+        ));
+        assert!(trace.is_empty());
     }
 
     #[test]

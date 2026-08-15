@@ -1,9 +1,11 @@
+![benchfck — exact machine-state benchmark harness](docs/assets/social-preview.png)
+
 # benchfck
 
 [![version](https://img.shields.io/badge/version-0.4.0--alpha-orange)](https://github.com/muend/benchfck)
 [![status](https://img.shields.io/badge/status-engineering_candidate-6f42c1)](VALIDITY.md)
 [![model results](https://img.shields.io/badge/model_results-none-lightgrey)](VALIDITY.md)
-[![release evidence](https://img.shields.io/badge/release_evidence-2-blue)](evidence/README.md)
+[![release evidence](https://img.shields.io/badge/release_evidence-9-blue)](evidence/README.md)
 [![CI](https://github.com/muend/benchfck/actions/workflows/ci.yml/badge.svg)](https://github.com/muend/benchfck/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/muend/benchfck/actions/workflows/codeql.yml/badge.svg)](https://github.com/muend/benchfck/actions/workflows/codeql.yml)
 [![license](https://img.shields.io/badge/code-Apache--2.0-blue)](LICENSE)
@@ -19,7 +21,30 @@ deterministic; no learned judge is used.
 
 > [!IMPORTANT]
 > **v0.4.0-alpha engineering candidate. No model results have been produced. No
-> leaderboard exists. Release gates in [`VALIDITY.md`](VALIDITY.md) are unmet.**
+> leaderboard exists. The official v0.4 evidence scope is arity 1; release gates in
+> [`VALIDITY.md`](VALIDITY.md) beyond the completed Phase 2 population package remain unmet.**
+
+## Project progress
+
+```mermaid
+flowchart LR
+    P0["Phase 0<br/>repository + evidence infrastructure<br/>complete"] --> P1["Phase 1<br/>measurement instruments<br/>complete"]
+    P1 --> P2["Phase 2<br/>arity-1 release evidence<br/>complete"]
+    P2 --> P3["Phase 3<br/>preregistration + model pilot<br/>next"]
+    P3 --> P4["Phase 4<br/>statistical analysis"]
+    P4 --> P5["Phase 5<br/>release + independent reproduction"]
+    classDef complete fill:#173a32,stroke:#55d6a0,color:#f4f1ea;
+    classDef next fill:#3d274f,stroke:#c084fc,color:#f4f1ea;
+    classDef pending fill:#172033,stroke:#64748b,color:#cbd5e1;
+    class P0,P1,P2 complete;
+    class P3 next;
+    class P4,P5 pending;
+```
+
+The deterministic arity-1 population package is complete and manifested. The next
+binding deliverable is a hashed preregistration; no model API call is admissible before
+it freezes the hypotheses, decoding settings, repeat count, stopping rule, and analysis
+plan.
 
 ```mermaid
 flowchart LR
@@ -111,7 +136,8 @@ validity contract is [`VALIDITY.md`](VALIDITY.md).
 | Cell model | unsigned 8-bit, wrapping | all executions |
 | Tape / left boundary | 30,000 cells / hard error | all executions |
 | Step cap | 8,000,000 | all executions; measured tier-9 max 5,678,676 + 40.9% margin |
-| Maximum input arity | 2 | generation; exhaustive domains are 256 or 65,536 |
+| Official v0.4 input arity | 1 | release generation and complete-domain evidence (256 bindings) |
+| Diagnostic/library arity ceiling | 2 | deferred v0.5 research path; requires a separate configuration and bivariate certificate |
 | Layout disciplines | 4 | three generation layouts + explicit held-out layout |
 | Statement templates target | 3 | compiler diversity |
 | Per-argument sensitivity | required | candidate acceptance |
@@ -172,7 +198,7 @@ cargo test --release --test property_10k -- --ignored
 | Evidence class | Published count | Meaning |
 |---|---:|---|
 | Model runs | **0** | No external evaluation has been run |
-| Release evidence artifacts | **4** | Arity-1 batch, matched pairs, budget pilot, and 500-candidate rejection histogram; Phase 2 is incomplete |
+| Release evidence artifacts | **9** | The v0.4 arity-1 Phase 2 population package is complete: population/pairs/budget/rejections, duplicate protocol/audit, property suite, carrier pilot, and leak scan |
 | Leaderboards | **0** | No ranking or aggregate benchmark score exists |
 | Engineering diagnostics | local only | Used to test instrumentation; not benchmark evidence |
 
@@ -180,7 +206,7 @@ cargo test --release --test property_10k -- --ignored
 
 - No external model adapter is wired into the repository.
 - No answer-bearing item, private constructor, or oracle artifact is published.
-- No completed release-evidence package or external model result is present under `evidence/`.
+- No completed model-evaluation, human-review, or clean-reproduction package is present.
 - No benchmark score, model comparison, leaderboard, or validity claim is reported.
 - E4 natural-language rendering exists only as residual-risk diagnostic code and is not an
   official evaluation rung.
@@ -192,24 +218,24 @@ cargo test --release --test property_10k -- --ignored
    subset support development; official scoring requires a separate, unpublished
    constructor set and a documented one-way rotation policy. That private set has not yet
    been populated or run.
-2. **Arity-1 certificate.** The hybrid T2 nontriviality certificate currently rejects
-   `arity != 1`; the planned arity-2 evidence batch is therefore unreachable until the
-   release scope is narrowed or the certificate is extended.
+2. **Arity-1 release scope.** v0.4 deliberately admits only arity-1 evidence. Arity-2
+   remains a v0.5 research target because its 65,536-point domain needs a memory-safe
+   exact enumerator and a genuinely bivariate analytical certificate; removing the
+   current guard would not constitute valid evidence.
 3. **E3 length control.** E3 intentionally has no 3.5× ratio gate. Any E3 analysis must use
    preregistered token-matched pairs; an unmatched raw contrast is not admissible evidence.
 4. **Constructor breadth.** The bias-invariant v4 design search produced 1,730 unique
    semantic functions in 51 coarse profile buckets, correcting a 108-record overcount
    caused by adjacent-only deduplication.
    The largest bucket contains 250 functions, so profile count is not a count of independent
-   semantic classes. Eight public constructors were promoted
-   across four structural families and pass full-domain, hybrid-gate, reference, and
-   Brainfuck step-cap regressions. This closes constructor selection, not accepted-batch
-   production or external validity: a pre-optimization 8-item easy diagnostic exhausted
-   512 attempts, while the first post-short-circuit single-item diagnostic accepted one
-   item after 19 rejections in 78.6 seconds. The 8- and 100-item throughput gates remain
-   open. Four families also remain a narrow public subset.
-5. **Unmet release work.** The 100-item batch, 10k release property run, external runs, and
-   independent clean-room reproduction are outstanding.
+   semantic classes. Eight public constructors across four structural families pass the
+   full-domain, hybrid-gate, reference, step-cap, accepted-population, and duplicate-audit
+   checks. Four families remain a narrow public development subset and do not substitute
+   for an unpublished official-scoring constructor population.
+5. **Unmet release work.** Preregistration, private constructor population, external model
+   runs, human review, statistical analysis, and independent clean-room reproduction are
+   outstanding. The completed 100-item batch and 10k property run are engineering evidence,
+   not model-validity claims.
 
 ## Citation and license
 
