@@ -3,6 +3,13 @@
 Passing unit tests makes the harness operational; it does not by itself make
 the benchmark publication-valid.
 
+**Versioned scope decision (D52).** Official v0.4 evidence is arity 1 only. Arity-2
+execution and verification primitives remain diagnostic library capabilities, but an
+arity-2 item is not admissible to v0.4 generation or release evidence. Arity-2 moves to
+v0.5 and requires a memory-safe exact enumerator over 65,536 bindings plus a bivariate
+analytical nontriviality certificate. Removing the existing arity guard alone would be
+an invalid relaxation, not an implementation of that certificate.
+
 ## Item acceptance constraints
 
 1. **Semantic program space.** The legacy affine-only five-shape grammar is
@@ -117,11 +124,11 @@ private-set rotation event without publishing its contents, and regenerate all
 official items and answer keys. Results from different private rotations must
 be reported as separate epochs rather than silently pooled.
 
-Two limitations remain explicit: the hybrid nontriviality certificate currently
-supports only arity 1, and the eight promoted public profiles span only four
-structural families. The public subset is for development and reproduction, not
-an adequate private official-scoring population. Publication records these
-limitations; it does not alter the benchmark logic to hide them.
+Two limitations remain explicit: v0.4 is deliberately scoped to arity 1, and the eight
+promoted public profiles span only four structural families. Arity-2 is a v0.5 research
+target, not a missing v0.4 release artefact. The public subset is for development and
+reproduction, not an adequate private official-scoring population. Publication records
+these limitations; it does not alter the benchmark logic to hide them.
 
 ## Current blocking status
 
@@ -161,9 +168,26 @@ Exact full-domain semantic fingerprints, reference solutions, and normalized IR 
 accepted-population, exact-duplicate, and matched-pair entry gates, not the full release
 contract. A deterministic first-20 budget pilot also passes with 12 distinct T2 caps,
 12 distinct T3 caps, exact equality across every rendered encoding, and zero caps at the
-384/96 safety ceilings. The near-duplicate metric/threshold, remaining pilots/property
-evidence, private constructor population, external model runs, and independent
-reproduction still do not exist.
+384/96 safety ceilings. Before any pairwise batch distance was inspected, protocol
+`benchfck.near-duplicate.v1` fixed complete-domain semantic distance at most 1/64,
+ladder-normalized IR Sørensen-Dice distance and canonical-reference token edit distance
+at most 0.10, with linkage `semantic AND (IR OR reference)` and a zero-flag release
+rule. Its manifested audit covers all 4,950 unordered pairs: exact semantic, normalized
+IR, and canonical-reference equalities are each zero; semantic-near and linked flagged
+pairs are also zero. The release-mode deterministic property population also passes:
+10,000 IR programs, 256 inputs each (2,560,000 bindings), three layouts, and exact
+IR/E0/E2/E3 equivalence in 250.773 seconds. The manifested carrier pilot uses the first
+item in every size tier from the same 100-item source. RLE and expanded preserve E0
+output and exact weighted steps;
+omitted preserves output while reporting strictly fewer steps. Relative to RLE, median
+program BPE is 1.452/1.708 for expanded E2/E3 and 0.613/0.683 for omitted E2/E3. Only
+MOVE representation varies; non-movement run compression is held fixed. RLE remains the
+only release carrier, and omitted remains inadmissible to the matched-step ladder. The
+manifested generated-batch leak scan checks all 1,610 raw public JSONL records before
+typed deserialization: private item records and all 28 forbidden answer/oracle keys are
+zero, 100 public/private item IDs match exactly, 1,510 task IDs are unique and non-orphan,
+and the private source is both Git-ignored and untracked. Private constructor population,
+external model runs, and independent reproduction still do not exist.
 
 A seed-42 production-path probe evaluated 500 candidates: 376 accepted (75.20%) and
 124 rejected. First-failure attribution was `off_idiom_rate` for 82 candidates (16.40%)
@@ -180,14 +204,16 @@ gate was not the first failure in this sample, not that the gate was absent or i
 - At least 20 items spanning at least five measured N values, demonstrating
   encoding-invariant item caps and at least five observed values for both T2
   and T3.
-- Arity-2 batch evidence proving independent input sampling and per-argument
-  perturbation sensitivity.
 - Ten occupied size tiers and the manifested `matched-pairs.csv`, with at least
   30 disjoint ±10% BPE pairs for each E0↔E2 and E0↔E3 contrast.
 - RLE/expanded/omitted pilot reported separately; omitted is never silently
   mixed into the accepted matched-step ladder.
 - Perfect and flawed family-complete controls, human review, contamination
   study, repeated-call uncertainty intervals, and clean-checkout reproduction.
+
+Arity-2 batch evidence is explicitly not a v0.4 release gate. It belongs to v0.5 after
+the bivariate nontriviality instrument exists and passes its own preregistered evidence
+plan.
 
 Until every release-evidence item passes, leaderboard results are engineering
 diagnostics and not claims about general reasoning ability.
