@@ -198,6 +198,15 @@ cargo test --release --test property_10k -- --ignored
 The local-control script requires the ignored private Phase 2 batch and writes only
 diagnostics below `target/`; it does not contact a provider or create model evidence.
 
+Release-readiness protocols:
+
+- [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md) separates manifest integrity,
+  clean-checkout regeneration, and the still-missing independent reproduction gate.
+- [`docs/HUMAN-REVIEW-PROTOCOL.md`](docs/HUMAN-REVIEW-PROTOCOL.md) fixes the review
+  boundary without pretending that model responses already exist.
+- [`docs/SCORING-EPOCHS.md`](docs/SCORING-EPOCHS.md) defines private-constructor
+  commitments and one-way rotation; no private scoring epoch exists yet.
+
 ## Evidence status
 
 | Evidence class | Published count | Meaning |

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://benchfck.local/schemas/scoring-epoch.schema.json",
+  "title": "benchfck public scoring epoch record v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "epoch_id",
+    "status",
+    "arity",
+    "mechanism_commit",
+    "public_config_sha256",
+    "private_constructor_count",
+    "private_constructor_commitment_sha256",
+    "private_item_batch_commitment_sha256",
+    "opened_at_utc",
+    "previous_epoch_id"
+  ],
+  "properties": {
+    "schema_version": {"const": "benchfck.scoring-epoch.v1"},
+    "epoch_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"},
+    "status": {"enum": ["planned", "active", "closed", "retired"]},
+    "arity": {"type": "integer", "minimum": 1},
+    "mechanism_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "public_config_sha256": {"$ref": "#/$defs/sha256"},
+    "private_constructor_count": {"type": "integer", "minimum": 1},
+    "private_constructor_commitment_sha256": {"$ref": "#/$defs/sha256"},
+    "private_item_batch_commitment_sha256": {"$ref": "#/$defs/sha256"},
+    "opened_at_utc": {"type": "string", "format": "date-time"},
+    "closed_at_utc": {"type": ["string", "null"], "format": "date-time"},
+    "previous_epoch_id": {"type": ["string", "null"]},
+    "closure_reason": {"type": ["string", "null"]},
+    "disclosure_commit": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "notes": {"type": "array", "items": {"type": "string"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"enum": ["closed", "retired"]}}},
+      "then": {"required": ["closed_at_utc", "closure_reason"]}
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}
