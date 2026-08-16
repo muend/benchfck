@@ -114,9 +114,10 @@ constructor subset for development and reproduction. Official scoring requires
 a separate constructor set reserved at the generator level and kept outside the
 public repository, together with private answer keys. A first private arity-1 set has now
 passed the offline acceptance suite and is bound by the content-free
-`v0.4-private-001` planned epoch record. It is not active, has not been sent to any model,
-and cannot support official scores or a leaderboard before preregistration and authorized
-custodian activation.
+`v0.4-private-001` planned epoch record. It is not active and has not been sent to any
+model. The pilot preregistration is now frozen and manifested, but official scoring and a
+leaderboard remain blocked on authorized custodian activation, the provider-runner
+controls, and the separately authorized paid run.
 
 Constructor rotation is one-way. A private constructor may be retired and
 disclosed for reproduction only after its scoring epoch is closed; once

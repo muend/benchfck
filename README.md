@@ -5,7 +5,7 @@
 [![version](https://img.shields.io/badge/version-0.4.0--alpha-orange)](https://github.com/muend/benchfck)
 [![status](https://img.shields.io/badge/status-engineering_candidate-6f42c1)](VALIDITY.md)
 [![model results](https://img.shields.io/badge/model_results-none-lightgrey)](VALIDITY.md)
-[![release evidence](https://img.shields.io/badge/release_evidence-9-blue)](evidence/README.md)
+[![release evidence](https://img.shields.io/badge/release_evidence-10-blue)](evidence/README.md)
 [![CI](https://github.com/muend/benchfck/actions/workflows/ci.yml/badge.svg)](https://github.com/muend/benchfck/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/muend/benchfck/actions/workflows/codeql.yml/badge.svg)](https://github.com/muend/benchfck/actions/workflows/codeql.yml)
 [![license](https://img.shields.io/badge/code-Apache--2.0-blue)](LICENSE)
@@ -31,7 +31,7 @@ flowchart LR
     P0["Phase 0<br/>repository + evidence infrastructure<br/>complete"] --> P1["Phase 1<br/>measurement instruments<br/>complete"]
     P1 --> P2["Phase 2<br/>arity-1 release evidence<br/>complete"]
     P2 --> PE["Private scoring population<br/>offline validated<br/>epoch planned"]
-    PE --> P3["Phase 3<br/>preregistration + model pilot<br/>deferred"]
+    PE --> P3["Phase 3<br/>preregistration frozen<br/>model pilot not run"]
     P3 --> P4["Phase 4<br/>statistical analysis"]
     P4 --> P5["Phase 5<br/>release + independent reproduction"]
     classDef complete fill:#173a32,stroke:#55d6a0,color:#f4f1ea;
@@ -42,14 +42,17 @@ flowchart LR
     class P3,P4,P5 pending;
 ```
 
-The deterministic arity-1 population package is complete and manifested. Model testing
-is currently deferred. A separate private arity-1 population has passed the offline gate
-suite and is bound by the content-free
+The deterministic arity-1 population package is complete and manifested. The
+[`model-pilot preregistration`](evidence/preregistration.md) is now frozen before any
+provider response: three model families, an H1-only confirmatory plan, a 2,160-call pilot,
+and a $40 pilot ceiling are fixed. A separate private arity-1 population has passed the
+offline gate suite and is bound by the content-free
 [`v0.4-private-001` planned epoch record](epochs/v0.4-private-001.json); the epoch is not
-active and no private source or answer key is published. When the model phase resumes,
-the next binding deliverable is a hashed preregistration; no model API call is admissible
-before it freezes the hypotheses, decoding settings, repeat count, stopping rule, and
-analysis plan. The offline/paid boundary is documented in
+active and no private source or answer key is published. No model API call has occurred or
+is authorized by publication alone. Before the pilot, the provider runner, offline
+controls, paid access, epoch activation, and an explicit start authorization must all pass.
+The provisional $700 full-run ceiling requires a separate post-pilot go/no-go. The
+offline/paid boundary is documented in
 [`docs/EVALUATION-RUNBOOK.md`](docs/EVALUATION-RUNBOOK.md).
 
 ```mermaid
@@ -230,7 +233,7 @@ Release-readiness protocols:
 | Evidence class | Published count | Meaning |
 |---|---:|---|
 | Model runs | **0** | No external evaluation has been run |
-| Release evidence artifacts | **9** | The v0.4 arity-1 Phase 2 population package is complete: population/pairs/budget/rejections, duplicate protocol/audit, property suite, carrier pilot, and leak scan |
+| Release evidence artifacts | **10** | Nine Phase 2 population artifacts plus the frozen, pre-response model-pilot preregistration |
 | Planned scoring epochs | **1** | Content-free private-set commitments exist; activation and model scoring remain blocked |
 | Leaderboards | **0** | No ranking or aggregate benchmark score exists |
 | Engineering diagnostics | local only | Used to test instrumentation; not benchmark evidence |
@@ -251,7 +254,8 @@ Release-readiness protocols:
    subset support development; official scoring requires a separate, unpublished
    constructor set and a documented one-way rotation policy. The first private set now has
    a `planned` commitment record, but it is not an active scoring epoch and remains
-   ineligible for model calls until preregistration and custodian activation.
+   ineligible for model calls until custodian activation and the remaining frozen-plan
+   execution gates pass.
 2. **Arity-1 release scope.** v0.4 deliberately admits only arity-1 evidence. Arity-2
    remains a v0.5 research target because its 65,536-point domain needs a memory-safe
    exact enumerator and a genuinely bivariate analytical certificate; removing the
@@ -266,10 +270,10 @@ Release-readiness protocols:
    full-domain, hybrid-gate, reference, step-cap, accepted-population, and duplicate-audit
    checks. Four families remain a narrow public development subset and do not substitute
    for an unpublished official-scoring constructor population.
-5. **Unmet release work.** Preregistration, private-epoch activation, external model runs,
-   human review, statistical analysis, and independent clean-room reproduction are
-   outstanding. The completed public and private offline populations are engineering
-   evidence, not model-validity claims.
+5. **Unmet release work.** Private-epoch activation, provider-runner controls, external
+   model runs, human review, statistical analysis, and independent clean-room reproduction
+   are outstanding. The completed public and private offline populations and frozen
+   preregistration are engineering evidence, not model-validity claims.
 
 ## Citation and license
 
