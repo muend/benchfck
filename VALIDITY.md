@@ -112,9 +112,11 @@ public/private answer split can prevent.
 The public repository therefore contains the mechanism and a declared public
 constructor subset for development and reproduction. Official scoring requires
 a separate constructor set reserved at the generator level and kept outside the
-public repository, together with private answer keys. The current alpha has not
-yet populated or run such an official private constructor set, so it cannot
-support official scores or a leaderboard.
+public repository, together with private answer keys. A first private arity-1 set has now
+passed the offline acceptance suite and is bound by the content-free
+`v0.4-private-001` planned epoch record. It is not active, has not been sent to any model,
+and cannot support official scores or a leaderboard before preregistration and authorized
+custodian activation.
 
 Constructor rotation is one-way. A private constructor may be retired and
 disclosed for reproduction only after its scoring epoch is closed; once
@@ -126,13 +128,14 @@ be reported as separate epochs rather than silently pooled.
 
 Public epoch commitments follow `schemas/scoring-epoch.schema.json` and the lifecycle in
 `docs/SCORING-EPOCHS.md`. These files define the record format and fail-closed rotation
-policy; they do not claim that a private constructor population or active epoch exists.
+policy. `epochs/v0.4-private-001.json` commits to a planned private population without
+claiming that the epoch is active or disclosing its contents.
 
 Private constructor execution, when created, must use the typed-IR
 `ConstructorProvider` boundary in `docs/PRIVATE-CONSTRUCTOR-INTEGRATION.md`. The provider
 may supply candidates but cannot replace any acceptance gate. The default CLI remains
 public-only; this repository contains no private provider, provider bundle, salt, answer
-key, or active epoch.
+key, private validation report, or active epoch.
 
 Two limitations remain explicit: v0.4 is deliberately scoped to arity 1, and the eight
 promoted public profiles span only four structural families. Arity-2 is a v0.5 research
@@ -196,8 +199,10 @@ only release carrier, and omitted remains inadmissible to the matched-step ladde
 manifested generated-batch leak scan checks all 1,610 raw public JSONL records before
 typed deserialization: private item records and all 28 forbidden answer/oracle keys are
 zero, 100 public/private item IDs match exactly, 1,510 task IDs are unique and non-orphan,
-and the private source is both Git-ignored and untracked. Private constructor population,
-external model runs, and independent reproduction still do not exist.
+and the private source is both Git-ignored and untracked. A separate private population
+now passes the same offline gates and has a planned public commitment, but its source,
+answers, salts, and validation report remain unpublished. External model runs and
+independent reproduction still do not exist.
 
 A seed-42 production-path probe evaluated 500 candidates: 376 accepted (75.20%) and
 124 rejected. First-failure attribution was `off_idiom_rate` for 82 candidates (16.40%)

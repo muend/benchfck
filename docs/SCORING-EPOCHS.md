@@ -63,6 +63,9 @@ hard-coded public Rust constructors. The library-level `ConstructorProvider` bou
 an ignored external Rust crate inject typed private IR into the same acceptance pipeline;
 it does not load opaque data or prove that a private implementation exists.
 
-No private constructor set or active scoring epoch exists yet. This document, schema, and
-validator define the fail-closed public boundary needed to create one later without
-changing the current project status.
+The first private arity-1 population is represented by the content-free
+`epochs/v0.4-private-001.json` record. It remains `planned`: its ignored provider, answers,
+salts, and validation report are retained by the custodian, but the public record carries
+no activation timestamp or validation-report hash. No model/provider call has occurred.
+Activation remains a separate authorized decision after preregistration and must update
+the record through the same fail-closed validator.

@@ -7,9 +7,9 @@ depend on external runs remain explicitly marked **NOT RUN**.
 ## Current claim
 
 benchfck v0.4 is an arity-1 engineering candidate: its generator, exact verifier, public
-population package, and offline evidence controls are operational. No model/provider has
-been called. Consequently H1/H2, effect sizes, confidence intervals, human error review,
-and model-level validity are unresolved.
+population package, private planned-epoch population, and offline evidence controls are
+operational. No model/provider has been called. Consequently H1/H2, effect sizes,
+confidence intervals, human error review, and model-level validity are unresolved.
 
 ## Fixed scope and methods
 
@@ -33,8 +33,9 @@ Phase 2 artifacts and their hashes are under `evidence/`.
 | Duplicate, budget, carrier, leak gates | PASS | Phase 2 population package is internally consistent |
 | 10k complete-domain compiler property suite | PASS | Cross-backend compiler evidence, not model evidence |
 | Clean-checkout developer reproduction | PASS (Core) | Protocol works for the developer; not independent attestation |
-| Private provider execution boundary | IMPLEMENTED | Same public acceptance pipeline; no private implementation included |
-| Private constructor population and active epoch | NOT CREATED | Official scoring cannot begin |
+| Private provider execution boundary | IMPLEMENTED | Same public acceptance pipeline; private implementation remains ignored and unpublished |
+| Private constructor population | PRIVATE VALIDATION PASS | 100 items, 8 opaque profiles, 10 tiers, 34/34 prompt-matched pairs; content-free commitments only |
+| Scoring epoch | PLANNED | `v0.4-private-001`; no activation timestamp/report hash, so official scoring cannot begin |
 | Preregistration | NOT FROZEN | No model call is authorized |
 | External model pilot | NOT RUN | H1/H2 have no result |
 | Blinded human review | NOT RUN | Requires frozen post-run sample |
@@ -76,7 +77,7 @@ adjudications, exclusions, and protocol deviations using `docs/HUMAN-REVIEW-PROT
 | Gate | Required evidence | Owner/action | State |
 |---|---|---|---|
 | P3 preregistration | Immutable document + hash before any response | Maintainer + user go/no-go | OPEN |
-| Private scoring epoch | Executable private population, private gate report, public commitment | Trusted custodian/auditor | OPEN |
+| Private scoring epoch | Executable private population, private gate report, public commitment | Trusted custodian/auditor | PLANNED; ACTIVATION OPEN |
 | Model pilot | Immutable responses and provider manifests under approved cap | Maintainer after approval | DEFERRED |
 | Statistical report | Preregistered estimates, intervals, null/negative results | Analysis phase | BLOCKED BY PILOT |
 | Human review | Two blinded reviewers + adjudication record | Independent reviewers | BLOCKED BY RESULTS |

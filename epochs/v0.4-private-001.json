@@ -1,0 +1,22 @@
+{
+  "schema_version": "benchfck.scoring-epoch.v1",
+  "epoch_id": "v0.4-private-001",
+  "status": "planned",
+  "arity": 1,
+  "mechanism_commit": "dae92411da1d82d73ef01c3c77801f6576934fe7",
+  "public_config_sha256": "31d6a834404aaf1b0890eb551df74b74319803c0d56faf0373b60331e82ed846",
+  "private_constructor_count": 8,
+  "private_constructor_commitment_sha256": "61a9c18104e384c541b1c191519125463095b5330a93b8bec270b2360f2d9eac",
+  "private_item_batch_commitment_sha256": "9ba00262fc9929372d15998695c746148d6c82bcca6e9fd6c475aa726b57b1cb",
+  "private_validation_report_sha256": null,
+  "opened_at_utc": "2026-08-16T16:19:11Z",
+  "activated_at_utc": null,
+  "closed_at_utc": null,
+  "previous_epoch_id": null,
+  "closure_reason": null,
+  "disclosure_commit": null,
+  "notes": [
+    "Private arity-1 population retained under custodian-controlled ignored storage.",
+    "No model or provider call has been made; scoring remains inactive."
+  ]
+}
