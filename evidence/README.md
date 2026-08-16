@@ -3,8 +3,8 @@
 This directory is reserved for deliberate, release-grade validation artifacts.
 Files under `target/` and ad-hoc outputs elsewhere are diagnostics, never evidence.
 
-**Published release artifacts: 9.** The v0.4 arity-1 Phase 2 population package is
-complete:
+**Published release artifacts: 10.** The v0.4 arity-1 Phase 2 population package is
+complete and the model-pilot preregistration is frozen:
 
 - `batch-100-arity1.jsonl`: 100 accepted public items/tasks across 8 profiles and 10 tiers.
 - `matched-pairs.csv`: 39 E0↔E2 and 31 E0↔E3 disjoint T2 prompt pairs, all within 10% BPE.
@@ -24,11 +24,16 @@ complete:
 - `leak-scan.md`: all 1,610 raw public records scanned recursively before typed parsing;
   zero private records or forbidden answer/oracle keys, exact 100-item public/private ID
   equality, unique/non-orphan tasks, and an ignored plus untracked private source.
+- `preregistration.md`: frozen before responses; fixes the three systems, H1-only
+  confirmatory analysis, 2,160-call pilot, request/decoding protocol, stopping rules, and
+  approved $40 pilot ceiling. The provisional $700 full-run ceiling still requires a
+  separate post-pilot go/no-go.
 
 These artifacts close only the arity-1 population, matched-pair, budget-diversity,
 candidate rejection-report, duplicate/near-duplicate, 10k property, carrier-pilot, and
-generated-batch leak gates. Together they complete the v0.4 arity-1 Phase 2 population
-package. They are not model results, human review, or clean-checkout reproduction.
+generated-batch leak gates. Together the first nine artifacts complete the v0.4 arity-1
+Phase 2 population package; the tenth freezes the Phase 3 pilot plan. They are not model
+results, human review, or clean-checkout reproduction.
 `MANIFEST.txt` is policy infrastructure, not a result artifact.
 
 Every evidence artifact except `MANIFEST.txt` must be listed in `MANIFEST.txt` as:

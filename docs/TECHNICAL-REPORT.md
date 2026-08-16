@@ -21,8 +21,8 @@ confidence intervals, human error review, and model-level validity are unresolve
   prompt length, size tier, layout, and movement density carried into analysis.
 - Grading is exact and programmatic. No LLM-as-judge path is permitted.
 
-The detailed acceptance and validity contract is in `VALIDITY.md`; the nine immutable
-Phase 2 artifacts and their hashes are under `evidence/`.
+The detailed acceptance and validity contract is in `VALIDITY.md`; nine immutable Phase 2
+artifacts and the frozen model-pilot preregistration are hashed under `evidence/`.
 
 ## Evidence ledger
 
@@ -36,8 +36,8 @@ Phase 2 artifacts and their hashes are under `evidence/`.
 | Private provider execution boundary | IMPLEMENTED | Same public acceptance pipeline; private implementation remains ignored and unpublished |
 | Private constructor population | PRIVATE VALIDATION PASS | 100 items, 8 opaque profiles, 10 tiers, 34/34 prompt-matched pairs; content-free commitments only |
 | Scoring epoch | PLANNED | `v0.4-private-001`; no activation timestamp/report hash, so official scoring cannot begin |
-| Preregistration | NOT FROZEN | No model call is authorized |
-| External model pilot | NOT RUN | H1/H2 have no result |
+| Preregistration | FROZEN | Three systems, H1-only confirmatory plan, 2,160-call pilot, and $40 ceiling; publication alone authorizes no call |
+| External model pilot | NOT RUN | H1 has no result; H2/Cox/IRT are descriptive or deferred |
 | Blinded human review | NOT RUN | Requires frozen post-run sample |
 | Independent third-party reproduction | NOT RUN | Release gate remains open |
 
@@ -76,9 +76,9 @@ adjudications, exclusions, and protocol deviations using `docs/HUMAN-REVIEW-PROT
 
 | Gate | Required evidence | Owner/action | State |
 |---|---|---|---|
-| P3 preregistration | Immutable document + hash before any response | Maintainer + user go/no-go | OPEN |
+| P3 preregistration | Immutable document + hash before any response | Maintainer + user go/no-go | PASS |
 | Private scoring epoch | Executable private population, private gate report, public commitment | Trusted custodian/auditor | PLANNED; ACTIVATION OPEN |
-| Model pilot | Immutable responses and provider manifests under approved cap | Maintainer after approval | DEFERRED |
+| Model pilot | Immutable responses and provider manifests under approved cap | Maintainer after controls, activation, and explicit start approval | NOT RUN |
 | Statistical report | Preregistered estimates, intervals, null/negative results | Analysis phase | BLOCKED BY PILOT |
 | Human review | Two blinded reviewers + adjudication record | Independent reviewers | BLOCKED BY RESULTS |
 | Independent reproduction | Signed clean-checkout report | Third party | OPEN |

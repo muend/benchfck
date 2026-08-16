@@ -4,14 +4,17 @@ This runbook defines the boundary between offline harness validation and any pai
 evaluation. It is operational guidance, not a preregistration and not evidence that a
 model run occurred.
 
-## Current hold
+## Current authorization boundary
 
-External model evaluation is deliberately deferred. Do not freeze or manifest a
-preregistration, select final model versions, create provider credentials, or make API
-calls until the project owner explicitly resumes that phase. Model names, availability,
-prices, token accounting, and decoding controls must be rechecked at that time.
+The project owner resumed the planning phase on 2026-08-16 and approved the three-system,
+H1-only, 2,160-call pilot design with a $40 pilot ceiling. The immutable plan is published
+as `evidence/preregistration.md`. No provider call has occurred, and freezing the plan does
+not authorize one. Paid evaluation remains blocked on the answer-stripped provider runner,
+offline controls, account/billing checks, scoring-epoch activation, and an explicit start
+authorization immediately before the first call. The provisional $700 full-run ceiling
+requires a separate post-pilot go/no-go.
 
-## Offline work allowed during the hold
+## Offline work allowed before paid execution
 
 1. Verify the hashes and structural contract of the published Phase 2 package:
 
