@@ -42,12 +42,12 @@ function Get-FileSha256 {
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-function Get-NormalizedArtifact {
+function ConvertTo-NormalizedArtifactText {
     param(
-        [Parameter(Mandatory)] [string]$Path,
+        [Parameter(Mandatory)] [string]$Text,
         [Parameter(Mandatory)] [string]$Kind
     )
-    $text = [System.IO.File]::ReadAllText($Path).Replace("`r`n", "`n")
+    $text = $Text.Replace("`r`n", "`n")
     switch ($Kind) {
         'property' {
             return [regex]::Replace(
@@ -75,6 +75,38 @@ function Get-NormalizedArtifact {
         }
         default { throw "Unknown normalization kind: $Kind" }
     }
+}
+
+function Get-NormalizedArtifact {
+    param(
+        [Parameter(Mandatory)] [string]$Path,
+        [Parameter(Mandatory)] [string]$Kind
+    )
+    ConvertTo-NormalizedArtifactText `
+        -Text ([System.IO.File]::ReadAllText($Path)) -Kind $Kind
+}
+
+$propertyA = "status=PASS`nelapsed_seconds=1.000`n"
+$propertyB = "status=PASS`nelapsed_seconds=999.000`n"
+if ((ConvertTo-NormalizedArtifactText -Text $propertyA -Kind 'property') -cne
+    (ConvertTo-NormalizedArtifactText -Text $propertyB -Kind 'property')) {
+    throw 'Property runtime-field normalization self-check failed'
+}
+$rejectionA = @'
+- Source SHA-256: `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`
+- Accepted: 376
+- Total candidate time: 1.000 s
+- Mean candidate time: 0.002 s
+'@
+$rejectionB = @'
+- Source SHA-256: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+- Accepted: 376
+- Total candidate time: 9.000 s
+- Mean candidate time: 0.018 s
+'@
+if ((ConvertTo-NormalizedArtifactText -Text $rejectionA -Kind 'rejection') -cne
+    (ConvertTo-NormalizedArtifactText -Text $rejectionB -Kind 'rejection')) {
+    throw 'Rejection runtime-field normalization self-check failed'
 }
 
 function Invoke-Benchfck {
@@ -107,6 +139,25 @@ try {
     $checks.Add([ordered]@{
         artifact = 'published checkout'
         comparison = 'manifest_and_public_contract'
+        status = 'PASS'
+    })
+    $epochSchema = Get-Content -LiteralPath 'schemas/scoring-epoch.schema.json' -Raw |
+        ConvertFrom-Json -Depth 100
+    if ($epochSchema.properties.schema_version.const -ne 'benchfck.scoring-epoch.v1') {
+        throw 'Scoring epoch schema version contract is missing'
+    }
+    foreach ($policyPath in @(
+        'docs/REPRODUCIBILITY.md',
+        'docs/HUMAN-REVIEW-PROTOCOL.md',
+        'docs/SCORING-EPOCHS.md'
+    )) {
+        if (-not (Test-Path -LiteralPath $policyPath -PathType Leaf)) {
+            throw "Missing release-readiness policy: $policyPath"
+        }
+    }
+    $checks.Add([ordered]@{
+        artifact = 'release-readiness policies'
+        comparison = 'schema_and_document_presence'
         status = 'PASS'
     })
 
