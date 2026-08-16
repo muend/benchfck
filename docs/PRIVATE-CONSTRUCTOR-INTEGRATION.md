@@ -101,5 +101,9 @@ detectable; it does not by itself prove any of these checks passed.
 ## Current status
 
 The provider boundary is implemented and the default public provider is regression-tested
-against the existing deterministic constructor source. No private provider, private
-constructor population, validation report, or active scoring epoch exists yet.
+against the existing deterministic constructor source. A separately compiled, ignored
+private provider has produced a 100-item arity-1 population that passed the offline gate
+suite and deterministic repeat. The content-free
+`epochs/v0.4-private-001.json` record commits to its constructor bundle and item batch.
+The provider, answers, salts, and validation report remain private; the epoch is
+`planned`, not `active`, and no model/provider call has occurred.

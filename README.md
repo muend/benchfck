@@ -30,20 +30,27 @@ deterministic; no learned judge is used.
 flowchart LR
     P0["Phase 0<br/>repository + evidence infrastructure<br/>complete"] --> P1["Phase 1<br/>measurement instruments<br/>complete"]
     P1 --> P2["Phase 2<br/>arity-1 release evidence<br/>complete"]
-    P2 --> P3["Phase 3<br/>preregistration + model pilot<br/>deferred"]
+    P2 --> PE["Private scoring population<br/>offline validated<br/>epoch planned"]
+    PE --> P3["Phase 3<br/>preregistration + model pilot<br/>deferred"]
     P3 --> P4["Phase 4<br/>statistical analysis"]
     P4 --> P5["Phase 5<br/>release + independent reproduction"]
     classDef complete fill:#173a32,stroke:#55d6a0,color:#f4f1ea;
+    classDef staged fill:#3b2f12,stroke:#f2c14e,color:#fff7dc;
     classDef pending fill:#172033,stroke:#64748b,color:#cbd5e1;
     class P0,P1,P2 complete;
+    class PE staged;
     class P3,P4,P5 pending;
 ```
 
 The deterministic arity-1 population package is complete and manifested. Model testing
-is currently deferred. When that phase resumes, the next binding deliverable is a hashed
-preregistration; no model API call is admissible before it freezes the hypotheses,
-decoding settings, repeat count, stopping rule, and analysis plan. The offline/paid
-boundary is documented in [`docs/EVALUATION-RUNBOOK.md`](docs/EVALUATION-RUNBOOK.md).
+is currently deferred. A separate private arity-1 population has passed the offline gate
+suite and is bound by the content-free
+[`v0.4-private-001` planned epoch record](epochs/v0.4-private-001.json); the epoch is not
+active and no private source or answer key is published. When the model phase resumes,
+the next binding deliverable is a hashed preregistration; no model API call is admissible
+before it freezes the hypotheses, decoding settings, repeat count, stopping rule, and
+analysis plan. The offline/paid boundary is documented in
+[`docs/EVALUATION-RUNBOOK.md`](docs/EVALUATION-RUNBOOK.md).
 
 ```mermaid
 flowchart LR
@@ -224,6 +231,7 @@ Release-readiness protocols:
 |---|---:|---|
 | Model runs | **0** | No external evaluation has been run |
 | Release evidence artifacts | **9** | The v0.4 arity-1 Phase 2 population package is complete: population/pairs/budget/rejections, duplicate protocol/audit, property suite, carrier pilot, and leak scan |
+| Planned scoring epochs | **1** | Content-free private-set commitments exist; activation and model scoring remain blocked |
 | Leaderboards | **0** | No ranking or aggregate benchmark score exists |
 | Engineering diagnostics | local only | Used to test instrumentation; not benchmark evidence |
 
@@ -241,8 +249,9 @@ Release-readiness protocols:
 1. **Open-generator hypothesis space.** Publishing a constructor family reveals that
    family to anyone inspecting the source. The public mechanism and a public constructor
    subset support development; official scoring requires a separate, unpublished
-   constructor set and a documented one-way rotation policy. That private set has not yet
-   been populated or run.
+   constructor set and a documented one-way rotation policy. The first private set now has
+   a `planned` commitment record, but it is not an active scoring epoch and remains
+   ineligible for model calls until preregistration and custodian activation.
 2. **Arity-1 release scope.** v0.4 deliberately admits only arity-1 evidence. Arity-2
    remains a v0.5 research target because its 65,536-point domain needs a memory-safe
    exact enumerator and a genuinely bivariate analytical certificate; removing the
@@ -257,10 +266,10 @@ Release-readiness protocols:
    full-domain, hybrid-gate, reference, step-cap, accepted-population, and duplicate-audit
    checks. Four families remain a narrow public development subset and do not substitute
    for an unpublished official-scoring constructor population.
-5. **Unmet release work.** Preregistration, private constructor population, external model
-   runs, human review, statistical analysis, and independent clean-room reproduction are
-   outstanding. The completed 100-item batch and 10k property run are engineering evidence,
-   not model-validity claims.
+5. **Unmet release work.** Preregistration, private-epoch activation, external model runs,
+   human review, statistical analysis, and independent clean-room reproduction are
+   outstanding. The completed public and private offline populations are engineering
+   evidence, not model-validity claims.
 
 ## Citation and license
 
