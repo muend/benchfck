@@ -4,6 +4,7 @@ use benchfck::{
     generator::{self, BuildSpec},
     leak_scan, metrics, near_duplicate, property,
     schema::{BaseItem, DifficultyBand, EncodingId, Family, JsonlRecord, TaskRecord},
+    scoring_epoch::ScoringEpochRecord,
     tasks::{
         self, DriftAfterKMock, IgnoreWrapMock, ModelAdapter, OffByOnePointerMock, PerfectMock,
         T1Answer,
@@ -83,6 +84,12 @@ enum Command {
         output: PathBuf,
     },
     Validate {
+        #[arg(long)]
+        input: PathBuf,
+    },
+    /// Validate a public scoring-epoch record and its lifecycle invariants.
+    /// This does not inspect or disclose private constructor material.
+    ValidateEpoch {
         #[arg(long)]
         input: PathBuf,
     },
@@ -724,6 +731,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 n += 1;
             }
             println!("validated {n} schema records");
+        }
+        Command::ValidateEpoch { input } => {
+            let epoch: ScoringEpochRecord = serde_json::from_reader(File::open(input)?)?;
+            epoch.validate()?;
+            println!(
+                "validated scoring epoch {} with status {:?}",
+                epoch.epoch_id, epoch.status
+            );
         }
         Command::MatchedPairs {
             private,

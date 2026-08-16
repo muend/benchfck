@@ -195,6 +195,11 @@ cargo test --release --test property_10k five_hundred_program_fast_property_shar
 cargo test --release --test property_10k -- --ignored
 ```
 
+The scheduled/manual GitHub workflow partitions the same deterministic 10,000-program
+population into four balanced, non-overlapping CI jobs. The release-evidence command still
+runs the complete population in one process, so sharding cannot change the published
+protocol or artifact.
+
 The local-control script requires the ignored private Phase 2 batch and writes only
 diagnostics below `target/`; it does not contact a provider or create model evidence.
 
@@ -205,7 +210,10 @@ Release-readiness protocols:
 - [`docs/HUMAN-REVIEW-PROTOCOL.md`](docs/HUMAN-REVIEW-PROTOCOL.md) fixes the review
   boundary without pretending that model responses already exist.
 - [`docs/SCORING-EPOCHS.md`](docs/SCORING-EPOCHS.md) defines private-constructor
-  commitments and one-way rotation; no private scoring epoch exists yet.
+  commitments, fail-closed lifecycle validation, and one-way rotation; no private scoring
+  epoch exists yet.
+- [`docs/TECHNICAL-REPORT.md`](docs/TECHNICAL-REPORT.md) freezes the report structure and
+  release-gate matrix while keeping every unrun result visibly marked.
 
 ## Evidence status
 

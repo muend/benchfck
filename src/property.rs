@@ -81,8 +81,36 @@ fn program(n: u64) -> Program {
     }
 }
 
-pub fn validate_range(limit: u64) -> Result<(), String> {
-    for n in 0..limit {
+/// Return one balanced, contiguous shard of `0..total`.
+///
+/// The first `total % shard_count` shards receive one extra program. Adjacent
+/// shards meet exactly, so their union covers the population without overlap.
+pub fn shard_bounds(
+    total: u64,
+    shard_index: u64,
+    shard_count: u64,
+) -> Result<std::ops::Range<u64>, String> {
+    if shard_count == 0 {
+        return Err("property shard count must be greater than zero".into());
+    }
+    if shard_index >= shard_count {
+        return Err(format!(
+            "property shard index {shard_index} is outside 0..{shard_count}"
+        ));
+    }
+    let base = total / shard_count;
+    let remainder = total % shard_count;
+    let start = shard_index * base + shard_index.min(remainder);
+    let length = base + u64::from(shard_index < remainder);
+    Ok(start..start + length)
+}
+
+/// Validate an exact half-open slice of the deterministic population.
+pub fn validate_slice(start: u64, end: u64) -> Result<(), String> {
+    if start > end {
+        return Err(format!("property slice start {start} exceeds end {end}"));
+    }
+    for n in start..end {
         let program = program(n);
         let layout = match n % 3 {
             0 => LayoutDiscipline::Contiguous,
@@ -107,6 +135,16 @@ pub fn validate_range(limit: u64) -> Result<(), String> {
     Ok(())
 }
 
+pub fn validate_range(limit: u64) -> Result<(), String> {
+    validate_slice(0, limit)
+}
+
+/// Validate one balanced shard of a fixed population.
+pub fn validate_shard(total: u64, shard_index: u64, shard_count: u64) -> Result<(), String> {
+    let bounds = shard_bounds(total, shard_index, shard_count)?;
+    validate_slice(bounds.start, bounds.end)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,5 +154,25 @@ mod tests {
         assert_eq!(program(0), program(0));
         assert_eq!(program(RELEASE_PROGRAMS - 1), program(RELEASE_PROGRAMS - 1));
         assert_ne!(program(0), program(1));
+    }
+
+    #[test]
+    fn balanced_shards_cover_population_once() {
+        let shards = (0..4)
+            .map(|index| shard_bounds(RELEASE_PROGRAMS, index, 4).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(shards[0].start, 0);
+        assert_eq!(shards.last().unwrap().end, RELEASE_PROGRAMS);
+        assert!(shards.windows(2).all(|pair| pair[0].end == pair[1].start));
+        assert!(shards.iter().all(|shard| shard.end - shard.start == 2_500));
+    }
+
+    #[test]
+    fn uneven_shards_are_balanced_and_invalid_layouts_fail_closed() {
+        assert_eq!(shard_bounds(10, 0, 3).unwrap(), 0..4);
+        assert_eq!(shard_bounds(10, 1, 3).unwrap(), 4..7);
+        assert_eq!(shard_bounds(10, 2, 3).unwrap(), 7..10);
+        assert!(shard_bounds(10, 0, 0).is_err());
+        assert!(shard_bounds(10, 3, 3).is_err());
     }
 }
