@@ -128,6 +128,12 @@ Public epoch commitments follow `schemas/scoring-epoch.schema.json` and the life
 `docs/SCORING-EPOCHS.md`. These files define the record format and fail-closed rotation
 policy; they do not claim that a private constructor population or active epoch exists.
 
+Private constructor execution, when created, must use the typed-IR
+`ConstructorProvider` boundary in `docs/PRIVATE-CONSTRUCTOR-INTEGRATION.md`. The provider
+may supply candidates but cannot replace any acceptance gate. The default CLI remains
+public-only; this repository contains no private provider, provider bundle, salt, answer
+key, or active epoch.
+
 Two limitations remain explicit: v0.4 is deliberately scoped to arity 1, and the eight
 promoted public profiles span only four structural families. Arity-2 is a v0.5 research
 target, not a missing v0.4 release artefact. The public subset is for development and
