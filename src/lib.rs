@@ -17,6 +17,7 @@ pub mod near_duplicate;
 pub mod oracle;
 pub mod property;
 pub mod schema;
+pub mod scoring_epoch;
 pub mod tasks;
 
 /// Encode bytes as stable lowercase hexadecimal without relying on digest
