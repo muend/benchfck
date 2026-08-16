@@ -3,7 +3,8 @@
 This directory is reserved for deliberate, release-grade validation artifacts.
 Files under `target/` and ad-hoc outputs elsewhere are diagnostics, never evidence.
 
-**Published release artifacts: 9.** Phase 2 has begun after all 2.0 entry gates passed:
+**Published release artifacts: 9.** The v0.4 arity-1 Phase 2 population package is
+complete:
 
 - `batch-100-arity1.jsonl`: 100 accepted public items/tasks across 8 profiles and 10 tiers.
 - `matched-pairs.csv`: 39 E0↔E2 and 31 E0↔E3 disjoint T2 prompt pairs, all within 10% BPE.
@@ -28,8 +29,7 @@ These artifacts close only the arity-1 population, matched-pair, budget-diversit
 candidate rejection-report, duplicate/near-duplicate, 10k property, carrier-pilot, and
 generated-batch leak gates. Together they complete the v0.4 arity-1 Phase 2 population
 package. They are not model results, human review, or clean-checkout reproduction.
-`MANIFEST.txt` is policy
-infrastructure, not a result artifact.
+`MANIFEST.txt` is policy infrastructure, not a result artifact.
 
 Every evidence artifact except `MANIFEST.txt` must be listed in `MANIFEST.txt` as:
 
@@ -37,4 +37,4 @@ Every evidence artifact except `MANIFEST.txt` must be listed in `MANIFEST.txt` a
 <lowercase SHA-256><two spaces><path relative to the repository root>
 ```
 
-Phase 2 evidence must not be generated until gates 2.0a, 2.0b, and 2.0c pass.
+Additional evidence must be generated only after its applicable validity gates pass.
