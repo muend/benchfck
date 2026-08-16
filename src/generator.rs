@@ -187,6 +187,8 @@ pub enum GenerateError {
     Oracle(#[from] crate::oracle::OracleError),
     #[error("tokenizer failed: {0}")]
     Tokenizer(String),
+    #[error("constructor provider contract failed: {0}")]
+    ConstructorProvider(String),
     #[error(
         "unable to produce accepted item after {attempts} deterministic attempts; last rejection: {last}; histogram: {histogram:?}"
     )]
@@ -208,6 +210,10 @@ pub enum GenerateError {
     )]
     BatchSizeLadder { required: usize, observed: usize },
     #[error(
+        "batch semantic-profile coverage is incomplete: provider declared {required}, observed {observed}"
+    )]
+    BatchSemanticProfiles { required: usize, observed: usize },
+    #[error(
         "batch has too few disjoint token-matched T2 pairs for {encoding}: required {required}, observed {observed}"
     )]
     BatchMatchedPairs {
@@ -217,12 +223,32 @@ pub enum GenerateError {
     },
 }
 
+/// One provider-produced candidate before obfuscation and acceptance checks.
+///
+/// Private implementations should use an opaque epoch-local `semantic_class`
+/// label; constructor names or source must never be copied into public output.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct GeneratedCase {
-    program: Program,
-    shape: &'static str,
-    size_tier: u8,
+pub struct ConstructorCase {
+    pub program: Program,
+    pub semantic_class: String,
+    pub size_tier: u8,
 }
+
+/// Candidate source boundary for public development constructors or an
+/// ignored, separately compiled private constructor crate.
+///
+/// Implementations provide typed IR only. Every acceptance and evidence gate
+/// remains in this module's single generation pipeline.
+pub trait ConstructorProvider {
+    /// Number of semantic-class labels the provider intends to populate.
+    fn semantic_profile_count(&self) -> usize;
+
+    /// Deterministically build one candidate for the supplied schedule cell.
+    fn build(&self, seed: u64, arity: u8, size_tier: u8) -> Result<ConstructorCase, String>;
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PublicConstructorProvider;
 
 fn mod_div_block(body: &mut Vec<Statement>, src: usize, modulus: u8) {
     // Scratch layout: counter=3, remainder=5, quotient=6,
@@ -368,7 +394,7 @@ fn add_constant(body: &mut Vec<Statement>, dst: usize, value: u8) {
 /// Eight terminating constructors promoted from the generated v3 template
 /// search. Each occupies a distinct name-independent semantic profile over the
 /// complete 256-input domain and survives the calibrated hybrid T2 gate.
-fn generated_program(seed: u64, arity: u8, size_tier: u8) -> GeneratedCase {
+fn generated_program(seed: u64, arity: u8, size_tier: u8) -> ConstructorCase {
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
     let bias = rng.random::<u8>();
     let mut body = vec![Statement::In { dst: 0 }];
@@ -499,15 +525,25 @@ fn generated_program(seed: u64, arity: u8, size_tier: u8) -> GeneratedCase {
         add_scaled(&mut body, 2, 1, 197 + (seed as usize % 3) * 6, false);
     }
     body.push(Statement::Out { src: 2 });
-    GeneratedCase {
+    ConstructorCase {
         program: Program {
             arity,
             output_arity: 1,
             variables: (0..declared_variables).map(|i| format!("v{i}")).collect(),
             body,
         },
-        shape,
+        semantic_class: shape.into(),
         size_tier,
+    }
+}
+
+impl ConstructorProvider for PublicConstructorProvider {
+    fn semantic_profile_count(&self) -> usize {
+        PROMOTED_SEMANTIC_PROFILES
+    }
+
+    fn build(&self, seed: u64, arity: u8, size_tier: u8) -> Result<ConstructorCase, String> {
+        Ok(generated_program(seed, arity, size_tier))
     }
 }
 fn hash(parts: &[&[u8]]) -> String {
@@ -585,8 +621,58 @@ fn choose_input(
     Ok((input, run))
 }
 
+fn validate_constructor_case(
+    case: &ConstructorCase,
+    requested_arity: u8,
+    requested_size_tier: u8,
+) -> Result<(), GenerateError> {
+    let label = case.semantic_class.as_bytes();
+    if label.is_empty()
+        || label.len() > 64
+        || !label[0].is_ascii_alphanumeric()
+        || !label
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(byte))
+    {
+        return Err(GenerateError::ConstructorProvider(
+            "semantic_class must be a 1..=64 character lowercase opaque label using [a-z0-9._-]"
+                .into(),
+        ));
+    }
+    if case.size_tier != requested_size_tier {
+        return Err(GenerateError::ConstructorProvider(format!(
+            "provider returned size tier {} for requested tier {requested_size_tier}",
+            case.size_tier
+        )));
+    }
+    if case.program.arity != requested_arity {
+        return Err(GenerateError::ConstructorProvider(format!(
+            "provider returned arity {} for requested arity {requested_arity}",
+            case.program.arity
+        )));
+    }
+    if case.program.output_arity != 1 {
+        return Err(GenerateError::ConstructorProvider(format!(
+            "provider returned output arity {}; benchfck v0.4 requires exactly one output",
+            case.program.output_arity
+        )));
+    }
+    Ok(())
+}
+
 pub fn generate(spec: &BuildSpec, defaults: &Defaults) -> Result<Vec<BaseItem>, GenerateError> {
-    generate_traced(spec, defaults).0
+    generate_with_provider(spec, defaults, &PublicConstructorProvider)
+}
+
+/// Run the exact production acceptance pipeline with an injected candidate
+/// provider. Private provider source can live in an ignored external crate;
+/// no alternate verifier or acceptance path is introduced.
+pub fn generate_with_provider(
+    spec: &BuildSpec,
+    defaults: &Defaults,
+    provider: &dyn ConstructorProvider,
+) -> Result<Vec<BaseItem>, GenerateError> {
+    generate_traced_with_provider(spec, defaults, provider).0
 }
 
 /// Same acceptance pipeline as [`generate`], additionally returning one
@@ -596,14 +682,23 @@ pub fn generate_traced(
     spec: &BuildSpec,
     defaults: &Defaults,
 ) -> (Result<Vec<BaseItem>, GenerateError>, Vec<CandidateOutcome>) {
+    generate_traced_with_provider(spec, defaults, &PublicConstructorProvider)
+}
+
+pub fn generate_traced_with_provider(
+    spec: &BuildSpec,
+    defaults: &Defaults,
+    provider: &dyn ConstructorProvider,
+) -> (Result<Vec<BaseItem>, GenerateError>, Vec<CandidateOutcome>) {
     let mut trace = Vec::new();
-    let result = generate_inner(spec, defaults, &mut trace);
+    let result = generate_inner(spec, defaults, provider, &mut trace);
     (result, trace)
 }
 
 fn generate_inner(
     spec: &BuildSpec,
     defaults: &Defaults,
+    provider: &dyn ConstructorProvider,
     trace: &mut Vec<CandidateOutcome>,
 ) -> Result<Vec<BaseItem>, GenerateError> {
     if spec.arity == 0 || spec.arity > defaults.max_arity {
@@ -612,6 +707,16 @@ fn generate_inner(
             maximum: defaults.max_arity,
         });
     }
+    let semantic_profile_count = provider.semantic_profile_count();
+    let cells = semantic_profile_count
+        .checked_mul(PROGRAM_SIZE_TIERS as usize)
+        .filter(|cells| *cells > 0)
+        .ok_or_else(|| {
+            GenerateError::ConstructorProvider(
+                "semantic_profile_count must be positive and must not overflow the tier grid"
+                    .into(),
+            )
+        })?;
     let mut accepted = vec![];
     let mut attempt = 0;
     let max_attempts = spec.max_attempts.unwrap_or(spec.count.max(1) * 64);
@@ -625,7 +730,6 @@ fn generate_inner(
     let mut cell_counts = std::collections::BTreeMap::<(String, u8), usize>::new();
     let mut shape_counts = std::collections::BTreeMap::<String, usize>::new();
     let mut accepted_fingerprints = std::collections::BTreeSet::<(u64, String)>::new();
-    let cells = PROMOTED_SEMANTIC_PROFILES * (PROGRAM_SIZE_TIERS as usize);
     let max_per_cell = spec
         .max_items_per_cell
         .unwrap_or_else(|| spec.count.div_ceil(cells))
@@ -659,30 +763,38 @@ fn generate_inner(
         // the tier from the attempt index sweeps the full shape x tier grid.
         let requested_size_tier =
             ((attempt / PROGRAM_SIZE_TIERS as usize) % PROGRAM_SIZE_TIERS as usize) as u8;
-        let generated = generated_program(item_seed, spec.arity, requested_size_tier);
+        let generated = provider
+            .build(item_seed, spec.arity, requested_size_tier)
+            .map_err(GenerateError::ConstructorProvider)?;
+        validate_constructor_case(&generated, spec.arity, requested_size_tier)?;
         probe = CandidateOutcome::new(
             attempt,
             item_seed,
-            generated.shape,
+            &generated.semantic_class,
             requested_size_tier,
             spec.difficulty,
         );
-        let cell = (generated.shape.to_string(), requested_size_tier);
+        let cell = (generated.semantic_class.clone(), requested_size_tier);
         if cell_counts.get(&cell).copied().unwrap_or(0) >= max_per_cell {
             reject!(
                 "size_tier_cell_quota",
                 format!(
                     "cell ({}, tier {requested_size_tier}) already holds {max_per_cell}",
-                    generated.shape
+                    generated.semantic_class
                 )
             );
         }
-        if shape_counts.get(generated.shape).copied().unwrap_or(0) >= max_per_shape {
+        if shape_counts
+            .get(&generated.semantic_class)
+            .copied()
+            .unwrap_or(0)
+            >= max_per_shape
+        {
             reject!(
                 "semantic_class_quota",
                 format!(
                     "semantic class {} already holds {max_per_shape} of {}",
-                    generated.shape, spec.count
+                    generated.semantic_class, spec.count
                 )
             );
         }
@@ -776,7 +888,10 @@ fn generate_inner(
         {
             reject!(
                 "worst_case_preflight",
-                format!("worst-case preflight for {}: {error}", generated.shape)
+                format!(
+                    "worst-case preflight for {}: {error}",
+                    generated.semantic_class
+                )
             );
         }
         let e2_source = bytecode.e2_source();
@@ -948,7 +1063,7 @@ fn generate_inner(
             encodings: enc,
             compiler: compiled.metadata,
             annotations: Annotations {
-                grammar_shape: generated.shape.into(),
+                grammar_shape: generated.semantic_class.clone(),
                 program_size_tier: generated.size_tier,
                 e0_program_bpe_tokens,
                 e2_program_bpe_tokens,
@@ -1029,7 +1144,9 @@ fn generate_inner(
         accepted_fingerprints.insert(fingerprint_key);
         accepted.push(item);
         *cell_counts.entry(cell).or_default() += 1;
-        *shape_counts.entry(generated.shape.to_string()).or_default() += 1;
+        *shape_counts
+            .entry(generated.semantic_class.clone())
+            .or_default() += 1;
         attempt += 1;
     }
     if accepted.len() != spec.count {
@@ -1065,6 +1182,12 @@ fn generate_inner(
             return Err(GenerateError::BatchSizeLadder {
                 required: PROGRAM_SIZE_TIERS as usize,
                 observed: observed_tiers,
+            });
+        }
+        if shape_counts.len() != semantic_profile_count {
+            return Err(GenerateError::BatchSemanticProfiles {
+                required: semantic_profile_count,
+                observed: shape_counts.len(),
             });
         }
         for encoding in [EncodingId::E2, EncodingId::E3] {
@@ -1172,6 +1295,30 @@ fn public_item_metadata(item: &BaseItem, defaults: &Defaults) -> PublicItemMetad
 mod tests {
     use super::*;
 
+    struct ContractProvider {
+        profiles: usize,
+        label: &'static str,
+    }
+
+    impl ConstructorProvider for ContractProvider {
+        fn semantic_profile_count(&self) -> usize {
+            self.profiles
+        }
+
+        fn build(&self, _seed: u64, arity: u8, size_tier: u8) -> Result<ConstructorCase, String> {
+            Ok(ConstructorCase {
+                program: Program {
+                    arity,
+                    output_arity: 1,
+                    variables: vec!["input".into()],
+                    body: vec![Statement::In { dst: 0 }, Statement::Out { src: 0 }],
+                },
+                semantic_class: self.label.into(),
+                size_tier,
+            })
+        }
+    }
+
     #[test]
     fn choose_input_returns_first_seed_rotated_candidate_in_requested_band() {
         let ir = Program {
@@ -1187,6 +1334,68 @@ mod tests {
         assert_eq!(run.state.output, vec![8]);
         assert_eq!(measured_band(run.state.steps), DifficultyBand::Easy);
         assert!(!run.trace.is_empty());
+    }
+
+    #[test]
+    fn public_provider_is_the_existing_deterministic_constructor_source() {
+        assert_eq!(
+            PublicConstructorProvider.build(42, 1, 7).unwrap(),
+            generated_program(42, 1, 7)
+        );
+    }
+
+    #[test]
+    fn provider_contract_fails_before_acceptance_work() {
+        let defaults = Defaults::load("config/defaults.toml").expect("defaults load");
+        let spec = BuildSpec {
+            seed: 42,
+            count: 1,
+            difficulty: DifficultyBand::Easy,
+            arity: 1,
+            held_out: false,
+            max_attempts: Some(1),
+            max_items_per_cell: None,
+        };
+        let (result, trace) = generate_traced_with_provider(
+            &spec,
+            &defaults,
+            &ContractProvider {
+                profiles: 0,
+                label: "private-01",
+            },
+        );
+        assert!(matches!(result, Err(GenerateError::ConstructorProvider(_))));
+        assert!(trace.is_empty());
+
+        let (result, trace) = generate_traced_with_provider(
+            &spec,
+            &defaults,
+            &ContractProvider {
+                profiles: 1,
+                label: "private constructor name",
+            },
+        );
+        assert!(matches!(result, Err(GenerateError::ConstructorProvider(_))));
+        assert!(trace.is_empty());
+    }
+
+    #[test]
+    fn provider_case_must_match_requested_arity_tier_and_output_contract() {
+        let mut case = ContractProvider {
+            profiles: 1,
+            label: "private-01",
+        }
+        .build(42, 1, 3)
+        .unwrap();
+        assert!(validate_constructor_case(&case, 1, 3).is_ok());
+        case.size_tier = 4;
+        assert!(validate_constructor_case(&case, 1, 3).is_err());
+        case.size_tier = 3;
+        case.program.arity = 2;
+        assert!(validate_constructor_case(&case, 1, 3).is_err());
+        case.program.arity = 1;
+        case.program.output_arity = 2;
+        assert!(validate_constructor_case(&case, 1, 3).is_err());
     }
 
     /// D29 regression. The size tier must be a function of the attempt index,
@@ -1328,7 +1537,7 @@ mod tests {
     #[test]
     fn grammar_spans_eight_non_affine_semantic_shapes() {
         let shapes: std::collections::BTreeSet<_> = (0..32)
-            .map(|seed| generated_program(seed, 1, 0).shape)
+            .map(|seed| generated_program(seed, 1, 0).semantic_class)
             .collect();
         assert_eq!(shapes.len(), 8);
         assert!(shapes.iter().all(|shape| !shape.contains("affine")));
@@ -1394,7 +1603,11 @@ mod tests {
                 let actual = crate::ir::execute(&generated.program, &[input], 1_000_000)
                     .unwrap()
                     .output[0];
-                assert_eq!(actual, expected, "shape={} input={input}", generated.shape);
+                assert_eq!(
+                    actual, expected,
+                    "shape={} input={input}",
+                    generated.semantic_class
+                );
             }
         }
     }
@@ -1417,7 +1630,7 @@ mod tests {
             assert!(
                 analytical.named_families_excluded,
                 "shape={} analytical={analytical:?}",
-                generated.shape
+                generated.semantic_class
             );
             profiles.insert(tasks::constructor_semantic_profile(&values, &analytical));
         }
@@ -1454,18 +1667,25 @@ mod tests {
                 let actual = bf
                     .execute(&[input], 1_000_000, false)
                     .unwrap_or_else(|error| {
-                        panic!("shape={} input={input} BF error={error}", generated.shape)
+                        panic!(
+                            "shape={} input={input} BF error={error}",
+                            generated.semantic_class
+                        )
                     })
                     .state
                     .output;
-                assert_eq!(actual, expected, "shape={} input={input}", generated.shape);
+                assert_eq!(
+                    actual, expected,
+                    "shape={} input={input}",
+                    generated.semantic_class
+                );
             }
             let reference =
                 tasks::search_g2_reference_expression(&compiled.e0, 1, &target, 1_000_000);
             assert!(
                 reference.is_some(),
                 "shape={} had no private reference witness",
-                generated.shape
+                generated.semantic_class
             );
         }
     }
@@ -1608,7 +1828,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
             let analytical = tasks::analyze_named_trivial_families(&values, 25);
-            println!("shape={} analytical={analytical:?}", raw.shape);
+            println!("shape={} analytical={analytical:?}", raw.semantic_class);
             rejected += usize::from(!analytical.named_families_excluded);
         }
         println!("analytically_rejected={rejected}/8");
@@ -1783,7 +2003,7 @@ mod tests {
                 .unwrap_or_else(|error| {
                     panic!(
                         "measurement cap failed: attempt={attempt} tier={tier} seed={item_seed} shape={} error={error}",
-                        generated.shape
+                        generated.semantic_class
                     )
                 });
             steps_by_tier[tier as usize].push(run.state.steps);

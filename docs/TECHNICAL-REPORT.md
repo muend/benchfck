@@ -33,6 +33,7 @@ Phase 2 artifacts and their hashes are under `evidence/`.
 | Duplicate, budget, carrier, leak gates | PASS | Phase 2 population package is internally consistent |
 | 10k complete-domain compiler property suite | PASS | Cross-backend compiler evidence, not model evidence |
 | Clean-checkout developer reproduction | PASS (Core) | Protocol works for the developer; not independent attestation |
+| Private provider execution boundary | IMPLEMENTED | Same public acceptance pipeline; no private implementation included |
 | Private constructor population and active epoch | NOT CREATED | Official scoring cannot begin |
 | Preregistration | NOT FROZEN | No model call is authorized |
 | External model pilot | NOT RUN | H1/H2 have no result |

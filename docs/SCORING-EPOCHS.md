@@ -58,9 +58,10 @@ The public validator proves record structure and lifecycle consistency only. It 
 establish that an unpublished constructor bundle is executable, that its count is honest,
 or that the committed private report passed the exact-domain, nontriviality, duplicate,
 budget, and leak gates. An authorized custodian or auditor must retain those materials,
-recompute their commitments, and sign the activation decision. The current generator's
-official constructors are still hard-coded public Rust constructors; this repository does
-not pretend that an opaque private constructor file can be loaded and executed.
+recompute their commitments, and sign the activation decision. The default CLI still uses
+hard-coded public Rust constructors. The library-level `ConstructorProvider` boundary lets
+an ignored external Rust crate inject typed private IR into the same acceptance pipeline;
+it does not load opaque data or prove that a private implementation exists.
 
 No private constructor set or active scoring epoch exists yet. This document, schema, and
 validator define the fail-closed public boundary needed to create one later without

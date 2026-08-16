@@ -212,6 +212,9 @@ Release-readiness protocols:
 - [`docs/SCORING-EPOCHS.md`](docs/SCORING-EPOCHS.md) defines private-constructor
   commitments, fail-closed lifecycle validation, and one-way rotation; no private scoring
   epoch exists yet.
+- [`docs/PRIVATE-CONSTRUCTOR-INTEGRATION.md`](docs/PRIVATE-CONSTRUCTOR-INTEGRATION.md)
+  defines the injectable typed-IR provider boundary; no private provider or population is
+  included in this repository.
 - [`docs/TECHNICAL-REPORT.md`](docs/TECHNICAL-REPORT.md) freezes the report structure and
   release-gate matrix while keeping every unrun result visibly marked.
 
