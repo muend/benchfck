@@ -59,6 +59,10 @@ jobs:
       - name: Run unit and CLI tests
         run: cargo test --locked --lib --bins
 
+      - name: Verify published evidence integrity
+        shell: pwsh
+        run: ./scripts/verify-evidence.ps1
+
   property-500:
     name: CI / property-500
     runs-on: ubuntu-24.04
@@ -72,5 +76,5 @@ jobs:
           rustup default stable
       - name: Run the 500-program property shard
         run: >-
-          cargo test --locked --test property_10k
+          cargo test --release --locked --test property_10k
           five_hundred_program_fast_property_shard -- --exact

@@ -30,21 +30,20 @@ deterministic; no learned judge is used.
 flowchart LR
     P0["Phase 0<br/>repository + evidence infrastructure<br/>complete"] --> P1["Phase 1<br/>measurement instruments<br/>complete"]
     P1 --> P2["Phase 2<br/>arity-1 release evidence<br/>complete"]
-    P2 --> P3["Phase 3<br/>preregistration + model pilot<br/>next"]
+    P2 --> P3["Phase 3<br/>preregistration + model pilot<br/>deferred"]
     P3 --> P4["Phase 4<br/>statistical analysis"]
     P4 --> P5["Phase 5<br/>release + independent reproduction"]
     classDef complete fill:#173a32,stroke:#55d6a0,color:#f4f1ea;
-    classDef next fill:#3d274f,stroke:#c084fc,color:#f4f1ea;
     classDef pending fill:#172033,stroke:#64748b,color:#cbd5e1;
     class P0,P1,P2 complete;
-    class P3 next;
-    class P4,P5 pending;
+    class P3,P4,P5 pending;
 ```
 
-The deterministic arity-1 population package is complete and manifested. The next
-binding deliverable is a hashed preregistration; no model API call is admissible before
-it freezes the hypotheses, decoding settings, repeat count, stopping rule, and analysis
-plan.
+The deterministic arity-1 population package is complete and manifested. Model testing
+is currently deferred. When that phase resumes, the next binding deliverable is a hashed
+preregistration; no model API call is admissible before it freezes the hypotheses,
+decoding settings, repeat count, stopping rule, and analysis plan. The offline/paid
+boundary is documented in [`docs/EVALUATION-RUNBOOK.md`](docs/EVALUATION-RUNBOOK.md).
 
 ```mermaid
 flowchart LR
@@ -187,11 +186,17 @@ update the SHA-256 manifest.
 Verification commands:
 
 ```powershell
+./scripts/verify-evidence.ps1
+./scripts/verify-local-controls.ps1
 cargo fmt -- --check
 cargo clippy --all-targets -- -D warnings
 cargo test
+cargo test --release --test property_10k five_hundred_program_fast_property_shard -- --exact
 cargo test --release --test property_10k -- --ignored
 ```
+
+The local-control script requires the ignored private Phase 2 batch and writes only
+diagnostics below `target/`; it does not contact a provider or create model evidence.
 
 ## Evidence status
 
