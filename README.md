@@ -212,6 +212,9 @@ protocol or artifact.
 
 The local-control script requires the ignored private Phase 2 batch and writes only
 diagnostics below `target/`; it does not contact a provider or create model evidence.
+The [`offline model-runner boundary`](docs/MODEL-RUNNER.md) likewise turns an
+answer-stripped packet into deterministic, hashed request cells and validates immutable
+retry/resume logs without credentials, network access, or provider cost.
 
 Release-readiness protocols:
 
@@ -225,6 +228,9 @@ Release-readiness protocols:
 - [`docs/PRIVATE-CONSTRUCTOR-INTEGRATION.md`](docs/PRIVATE-CONSTRUCTOR-INTEGRATION.md)
   defines the injectable typed-IR provider boundary; no private provider or population is
   included in this repository.
+- [`docs/MODEL-RUNNER.md`](docs/MODEL-RUNNER.md) defines answer-stripped request planning,
+  frozen system identity, immutable attempt records, and fail-closed resume behavior; it
+  contains no network client.
 - [`docs/TECHNICAL-REPORT.md`](docs/TECHNICAL-REPORT.md) freezes the report structure and
   release-gate matrix while keeping every unrun result visibly marked.
 

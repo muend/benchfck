@@ -2,7 +2,7 @@ use benchfck::{
     PINNED_STEP_CAP, carrier_pilot,
     config::Defaults,
     generator::{self, BuildSpec},
-    leak_scan, metrics, near_duplicate, property,
+    leak_scan, metrics, model_runner, near_duplicate, property,
     schema::{BaseItem, DifficultyBand, EncodingId, Family, JsonlRecord, TaskRecord},
     scoring_epoch::ScoringEpochRecord,
     tasks::{
@@ -73,6 +73,28 @@ enum Command {
         output: PathBuf,
         #[arg(long, value_enum, default_value = "perfect")]
         solver: Solver,
+    },
+    /// Build an answer-stripped, deterministic request plan without making
+    /// any provider or network call. Diagnostic output only.
+    ModelPlan {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long, default_value = "config/model-pilot-systems.json")]
+        systems: PathBuf,
+        #[arg(long, value_enum, default_value = "pilot")]
+        scope: ModelPlanScope,
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Validate an immutable attempt log and emit only the next safe attempts.
+    /// Delivered or retry-exhausted runs are never rescheduled.
+    ModelResume {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        attempts: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
     },
     /// Score externally produced responses against a private export.
     Score {
@@ -249,6 +271,23 @@ enum Solver {
     OffByOnePointer,
     DriftAfterK,
     IgnoreWrap,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum ModelPlanScope {
+    Pilot,
+    MatrixOnce,
+    Full,
+}
+
+impl From<ModelPlanScope> for model_runner::PlanScope {
+    fn from(value: ModelPlanScope) -> Self {
+        match value {
+            ModelPlanScope::Pilot => Self::Pilot,
+            ModelPlanScope::MatrixOnce => Self::MatrixOnce,
+            ModelPlanScope::Full => Self::Full,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
@@ -1444,6 +1483,62 @@ elapsed_seconds={elapsed_seconds:.3}\n",
                 }
             }
             w.flush()?;
+        }
+        Command::ModelPlan {
+            input,
+            systems,
+            scope,
+            output,
+        } => {
+            validate_generate_output(&output, ArtifactClass::Diagnostic)?;
+            if input == systems || input == output || systems == output {
+                return Err("model-plan input, systems, and output paths must be distinct".into());
+            }
+            let input_bytes = fs::read(input)?;
+            let packet = model_runner::load_answer_stripped_packet(&input_bytes)?;
+            let system_bytes = fs::read(systems)?;
+            let manifest: model_runner::SystemManifest = serde_json::from_slice(&system_bytes)?;
+            let manifest_sha256 = benchfck::lower_hex(&Sha256::digest(&system_bytes));
+            let plan =
+                model_runner::build_plan(&packet, &manifest, &manifest_sha256, scope.into())?;
+            let mut writer = BufWriter::new(File::create(output)?);
+            for record in &plan {
+                serde_json::to_writer(&mut writer, record)?;
+                writer.write_all(b"\n")?;
+            }
+            writer.flush()?;
+            eprintln!(
+                "offline model plan: {} request(s), {} system(s), no provider calls",
+                plan.len(),
+                manifest.systems.len()
+            );
+        }
+        Command::ModelResume {
+            plan,
+            attempts,
+            output,
+        } => {
+            validate_generate_output(&output, ArtifactClass::Diagnostic)?;
+            if plan == attempts || plan == output || attempts == output {
+                return Err(
+                    "model-resume plan, attempts, and output paths must be distinct".into(),
+                );
+            }
+            let plan = model_runner::load_plan(&fs::read(plan)?)?;
+            let attempts = model_runner::load_attempts(&fs::read(attempts)?)?;
+            let decision = model_runner::schedule_resume(plan, &attempts)?;
+            let mut writer = BufWriter::new(File::create(output)?);
+            for record in &decision.pending {
+                serde_json::to_writer(&mut writer, record)?;
+                writer.write_all(b"\n")?;
+            }
+            writer.flush()?;
+            eprintln!(
+                "offline resume plan: {} pending, {} completed, {} retry-exhausted; no provider calls",
+                decision.pending.len(),
+                decision.completed_runs,
+                decision.exhausted_runs
+            );
         }
         Command::Score {
             private,
