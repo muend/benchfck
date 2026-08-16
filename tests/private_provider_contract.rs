@@ -24,6 +24,7 @@ impl ConstructorProvider for ExternalProvider {
             },
             semantic_class: "epoch-class-00".into(),
             size_tier,
+            private_reference_solution: None,
         })
     }
 }

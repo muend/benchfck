@@ -2335,6 +2335,38 @@ pub struct ReferenceSearchResult {
     pub matched_digest_hex: String,
 }
 
+/// Parse and complete-domain validate a provider-supplied private reference.
+///
+/// This is not a nontriviality proof. The generator runs the same independent
+/// hybrid gate before accepting this result. It only lets a genuinely new
+/// private constructor family provide a canonical answer that cannot appear in
+/// the public G2 reference search space.
+pub fn validate_exact_reference_expression(
+    source: &str,
+    arity: u8,
+    target: &crate::oracle::SemanticFingerprint,
+) -> Result<ReferenceSearchResult, String> {
+    if !(1..=2).contains(&arity) {
+        return Err(format!(
+            "reference validation does not support arity {arity}"
+        ));
+    }
+    let expressions = parse_solution(source)?;
+    let normalized_source = render_solution(&expressions);
+    let digest = expression_digest(&expressions, arity)
+        .ok_or_else(|| "reference expression failed complete-domain evaluation".to_string())?;
+    if digest != target.digest_hex {
+        return Err("private reference does not match the constructor domain table".into());
+    }
+    Ok(ReferenceSearchResult {
+        tokens_upper_bound: lexical_token_count(&normalized_source) as u32,
+        solution: normalized_source,
+        candidates_enumerated: 1,
+        candidates_full_domain_checked: 1,
+        matched_digest_hex: digest,
+    })
+}
+
 /// Declared-family G2 search retained only to obtain a private perfect mock
 /// answer. It is not an acceptance proof and makes no minimality claim. The
 /// hybrid gate never consumes the result of this search.
@@ -2982,6 +3014,24 @@ mod tests {
             reference.tokens_upper_bound as u64,
             lexical_token_count(&reference.solution)
         );
+    }
+
+    #[test]
+    fn provider_reference_is_normalized_and_complete_domain_validated() {
+        let source = "def solve(inputs):\n    return [((inputs[0]%11)*(inputs[0]%13)+(inputs[0]//17)*7+113)%256]";
+        let parsed = parse_solution(source).unwrap();
+        let target = crate::oracle::SemanticFingerprint {
+            algorithm: "sha256_length_delimited_domain_table".into(),
+            domain_size: 256,
+            digest_hex: expression_digest(&parsed, 1).unwrap(),
+        };
+        let reference = validate_exact_reference_expression(source, 1, &target).unwrap();
+        assert_eq!(reference.candidates_enumerated, 1);
+        assert_eq!(reference.candidates_full_domain_checked, 1);
+        assert_eq!(reference.matched_digest_hex, target.digest_hex);
+
+        let wrong = "def solve(inputs):\n    return [((inputs[0]%11)*(inputs[0]%13)+(inputs[0]//17)*8+113)%256]";
+        assert!(validate_exact_reference_expression(wrong, 1, &target).is_err());
     }
 
     #[test]

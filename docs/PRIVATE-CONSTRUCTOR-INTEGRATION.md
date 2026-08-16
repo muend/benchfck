@@ -40,6 +40,8 @@ impl ConstructorProvider for PrivateProvider {
             // Use an opaque epoch-local label, never a constructor/formula name.
             semantic_class: opaque_class_for(seed),
             size_tier,
+            // Required when the private family is outside the public G2 search.
+            private_reference_solution: Some(private_reference_for(seed)),
         })
     }
 }
@@ -48,6 +50,7 @@ impl ConstructorProvider for PrivateProvider {
 #     unimplemented!()
 # }
 # fn opaque_class_for(_: u64) -> String { "epoch-class-00".into() }
+# fn private_reference_for(_: u64) -> String { unimplemented!() }
 # fn run(spec: &BuildSpec, defaults: &Defaults) -> Result<(), Box<dyn std::error::Error>> {
 let private_items = generate_with_provider(spec, defaults, &PrivateProvider)?;
 # let _ = private_items;
@@ -68,6 +71,9 @@ loads arbitrary source, shared libraries, or serialized programs at runtime.
   pass syntax validation.
 - Returned arity and size tier exactly match the requested schedule cell; output arity is
   exactly one for v0.4.
+- A supplied private reference is parsed and evaluated over the complete domain. Its digest
+  must exactly match the compiled constructor, its constant-folded grammar length must be
+  25–384 tokens, and its lexical upper bound must fit the T2 response cap.
 - The same mechanism commit, provider source, salt, config, seed, arity, and tier produce
   byte-identical typed IR. Determinism must be checked in the private validation report.
 - Provider errors and contract mismatches abort generation. They are configuration faults,

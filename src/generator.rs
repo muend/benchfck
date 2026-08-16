@@ -227,11 +227,15 @@ pub enum GenerateError {
 ///
 /// Private implementations should use an opaque epoch-local `semantic_class`
 /// label; constructor names or source must never be copied into public output.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ConstructorCase {
     pub program: Program,
     pub semantic_class: String,
     pub size_tier: u8,
+    /// Canonical answer for a genuinely private family outside the public G2
+    /// search space. It is never trusted: the shared pipeline parses it,
+    /// evaluates the complete domain, and enforces folded and response budgets.
+    pub private_reference_solution: Option<String>,
 }
 
 /// Candidate source boundary for public development constructors or an
@@ -534,6 +538,7 @@ fn generated_program(seed: u64, arity: u8, size_tier: u8) -> ConstructorCase {
         },
         semantic_class: shape.into(),
         size_tier,
+        private_reference_solution: None,
     }
 }
 
@@ -977,19 +982,45 @@ fn generate_inner(
             );
         }
         debug_assert!(nontriviality_witness.hybrid_gate_passed);
-        let Some(reference) = tasks::search_g2_reference_expression(
-            &compiled.e0,
-            ir.arity,
-            &fingerprint,
-            defaults.step_cap,
-        ) else {
-            reject!(
-                "reference_expression_not_found",
-                "declared G2 search found no matching reference candidate".into()
-            );
+        let reference = if let Some(source) = generated.private_reference_solution.as_deref() {
+            let folded_tokens = tasks::folded_solution_token_count(source)
+                .map_err(GenerateError::ConstructorProvider)?;
+            if folded_tokens < u64::from(defaults.t2_nontriviality_threshold)
+                || folded_tokens > u64::from(defaults.t2_token_cap)
+            {
+                return Err(GenerateError::ConstructorProvider(format!(
+                    "private reference has {folded_tokens} folded tokens; required range is {}..={}",
+                    defaults.t2_nontriviality_threshold, defaults.t2_token_cap
+                )));
+            }
+            let reference =
+                tasks::validate_exact_reference_expression(source, ir.arity, &fingerprint)
+                    .map_err(GenerateError::ConstructorProvider)?;
+            if reference.tokens_upper_bound > defaults.t2_token_cap {
+                return Err(GenerateError::ConstructorProvider(format!(
+                    "private reference lexical upper bound {} exceeds T2 cap {}",
+                    reference.tokens_upper_bound, defaults.t2_token_cap
+                )));
+            }
+            nontriviality_witness.reference_search_algorithm =
+                "provider_supplied_complete_domain_validated_v1".into();
+            reference
+        } else {
+            let Some(reference) = tasks::search_g2_reference_expression(
+                &compiled.e0,
+                ir.arity,
+                &fingerprint,
+                defaults.step_cap,
+            ) else {
+                reject!(
+                    "reference_expression_not_found",
+                    "declared G2 search found no matching reference candidate".into()
+                );
+            };
+            nontriviality_witness.reference_search_algorithm =
+                "declared_family_G2_reference_only_v2".into();
+            reference
         };
-        nontriviality_witness.reference_search_algorithm =
-            "declared_family_G2_reference_only_v2".into();
         nontriviality_witness.reference_candidates_enumerated = reference.candidates_enumerated;
         nontriviality_witness.reference_candidates_full_domain_checked =
             reference.candidates_full_domain_checked;
@@ -1315,6 +1346,7 @@ mod tests {
                 },
                 semantic_class: self.label.into(),
                 size_tier,
+                private_reference_solution: None,
             })
         }
     }
@@ -1338,10 +1370,7 @@ mod tests {
 
     #[test]
     fn public_provider_is_the_existing_deterministic_constructor_source() {
-        assert_eq!(
-            PublicConstructorProvider.build(42, 1, 7).unwrap(),
-            generated_program(42, 1, 7)
-        );
+        assert!(PublicConstructorProvider.build(42, 1, 7).unwrap() == generated_program(42, 1, 7));
     }
 
     #[test]
@@ -1488,7 +1517,7 @@ mod tests {
     fn same_program_seed_is_structurally_stable() {
         let a = generated_program(7, 1, 0);
         let b = generated_program(7, 1, 0);
-        assert_eq!(a, b);
+        assert!(a == b);
     }
     #[test]
     fn seed_42_compiler_regression() {
