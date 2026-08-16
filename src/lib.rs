@@ -13,6 +13,7 @@ pub mod generator;
 pub mod ir;
 pub mod leak_scan;
 pub mod metrics;
+pub mod model_runner;
 pub mod near_duplicate;
 pub mod oracle;
 pub mod property;

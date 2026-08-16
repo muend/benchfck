@@ -1,0 +1,23 @@
+{
+  "schema_version": "benchfck.model-systems.v1",
+  "systems": [
+    {
+      "system_id": "M1",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "reasoning_setting": "none"
+    },
+    {
+      "system_id": "M2",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "reasoning_setting": "disabled"
+    },
+    {
+      "system_id": "M3",
+      "provider": "google",
+      "model_id": "gemini-3.5-flash",
+      "reasoning_setting": "minimal"
+    }
+  ]
+}

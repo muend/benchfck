@@ -9,10 +9,11 @@ model run occurred.
 The project owner resumed the planning phase on 2026-08-16 and approved the three-system,
 H1-only, 2,160-call pilot design with a $40 pilot ceiling. The immutable plan is published
 as `evidence/preregistration.md`. No provider call has occurred, and freezing the plan does
-not authorize one. Paid evaluation remains blocked on the answer-stripped provider runner,
-offline controls, account/billing checks, scoring-epoch activation, and an explicit start
-authorization immediately before the first call. The provisional $700 full-run ceiling
-requires a separate post-pilot go/no-go.
+not authorize one. The answer-stripped offline planner and resume contract are implemented;
+paid evaluation remains blocked on provider adapters, the remaining offline controls,
+account/billing checks, scoring-epoch activation, and an explicit start authorization
+immediately before the first call. The provisional $700 full-run ceiling requires a
+separate post-pilot go/no-go.
 
 ## Offline work allowed before paid execution
 
@@ -31,7 +32,19 @@ requires a separate post-pilot go/no-go.
 
    Outputs stay under `target/local-controls/` and are diagnostics, never evidence.
 
-3. Run formatting, lint, unit, CLI, and the release-mode 500-program property shard.
+3. Build the frozen pilot request plan from the ignored answer-stripped packet. This
+   validates raw forbidden keys, task selection, exact prompt/request hashes, frozen model
+   identities, and 2,160 unique run cells without reading credentials or using a network:
+
+   ```powershell
+   cargo run --release -- model-plan `
+     --input <answer-stripped-packet.jsonl> `
+     --scope pilot --output target/model-pilot-plan.jsonl
+   ```
+
+   `docs/MODEL-RUNNER.md` defines the immutable attempt and idempotent resume contract.
+
+4. Run formatting, lint, unit, CLI, and the release-mode 500-program property shard.
    These checks use no model service and incur no provider cost.
 
 ## Resume gate
