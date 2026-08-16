@@ -63,6 +63,13 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-evidence.ps1
 
+      - name: Verify from a clean checkout
+        shell: pwsh
+        run: >-
+          ./scripts/reproduce-phase2.ps1
+          -Mode Verify
+          -Workspace target/ci-clean-checkout
+
   property-500:
     name: CI / property-500
     runs-on: ubuntu-24.04

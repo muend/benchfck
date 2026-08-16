@@ -124,6 +124,10 @@ private-set rotation event without publishing its contents, and regenerate all
 official items and answer keys. Results from different private rotations must
 be reported as separate epochs rather than silently pooled.
 
+Public epoch commitments follow `schemas/scoring-epoch.schema.json` and the lifecycle in
+`docs/SCORING-EPOCHS.md`. These files define the record format and fail-closed rotation
+policy; they do not claim that a private constructor population or active epoch exists.
+
 Two limitations remain explicit: v0.4 is deliberately scoped to arity 1, and the eight
 promoted public profiles span only four structural families. Arity-2 is a v0.5 research
 target, not a missing v0.4 release artefact. The public subset is for development and
@@ -210,6 +214,11 @@ gate was not the first failure in this sample, not that the gate was absent or i
   mixed into the accepted matched-step ladder.
 - Perfect and flawed family-complete controls, human review, contamination
   study, repeated-call uncertainty intervals, and clean-checkout reproduction.
+
+`docs/HUMAN-REVIEW-PROTOCOL.md` and `docs/REPRODUCIBILITY.md` define the pre-result
+protocols for two of these gates. Protocol availability is not completion: human review
+still requires frozen sampling plus completed review, and independent reproduction still
+requires a third party's clean run and attestation.
 
 Arity-2 batch evidence is explicitly not a v0.4 release gate. It belongs to v0.5 after
 the bivariate nontriviality instrument exists and passes its own preregistered evidence
