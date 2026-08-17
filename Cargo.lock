@@ -62,12 +62,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "base64"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
-
-[[package]]
 name = "benchfck"
 version = "0.4.0-alpha"
 dependencies = [
@@ -546,11 +540,10 @@ dependencies = [
 
 [[package]]
 name = "tiktoken"
-version = "3.8.3"
+version = "4.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b20344e365844e1423f0a87e8a66d9f0de6c394ba47a55745029a83f2e5ebd65"
+checksum = "40ba662e4a36f3db9561d09f1ba085f719aaf393b7dbd71e23a2e16b8e4e4e19"
 dependencies = [
- "base64",
  "regex",
  "rustc-hash",
  "ruzstd",
