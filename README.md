@@ -24,6 +24,12 @@ deterministic; no learned judge is used.
 > leaderboard exists. The official v0.4 evidence scope is arity 1; release gates in
 > [`VALIDITY.md`](VALIDITY.md) beyond the completed Phase 2 population package remain unmet.**
 
+**Who it is for:** researchers who want LLM evaluation items generated from a seed and scored exactly, rather than a fixed public dataset.  
+**Try it (Rust only, no API key):** `cargo build --release`, then `cargo run --release -- generate --seed 42 --count 1 --difficulty hard --arity 1 --output target/benchfck-public.jsonl` and `cargo run --release -- validate --input target/benchfck-public.jsonl`. Full steps: [Quick start](#quick-start).  
+**Status:** v0.4.0-alpha engineering candidate; official evidence scope is arity 1.  
+**Not yet:** no model has been run, no leaderboard exists, and the private scoring set is planned, not active.  
+**Note:** `mock-run --solver perfect` checks the harness with a reference solver; it is not a model result.  
+
 ## Project progress
 
 ```mermaid
